@@ -12,7 +12,8 @@ const { ALLOWED_CARE_TYPES, ALLOWED_URGENCIES } = require("../config/taxonomy");
 const TriageRequestSchema = z.object({
   user_input: z
     .string({ required_error: "user_input is required" })
-    .min(1, "user_input cannot be empty")
+    .trim()
+    .min(1, "user_input cannot be empty or whitespace only")
     .max(2000, "user_input exceeds maximum allowed length of 2000 characters"),
   language: z.enum(["auto", "hindi", "english", "hinglish"]).optional().default("auto"),
   location: z

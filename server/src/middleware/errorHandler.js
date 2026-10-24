@@ -10,8 +10,8 @@ function errorHandler(err, req, res, next) {
   const responsePayload = {
     success: false,
     error: {
-      code: err.code || (statusCode === 409 ? "CONFLICT" : statusCode === 404 ? "NOT_FOUND" : "INTERNAL_ERROR"),
-      message: err.message || "An unexpected error occurred"
+      code: statusCode === 409 ? "CONFLICT" : statusCode === 404 ? "NOT_FOUND" : statusCode === 500 && err.code === "BOOKING_PERSISTENCE_FAILED" ? "BOOKING_PERSISTENCE_FAILED" : err.code || "INTERNAL_ERROR",
+      message: statusCode === 500 && err.code === "BOOKING_PERSISTENCE_FAILED" ? "Booking could not be saved. Please try again." : err.message || "An unexpected error occurred"
     }
   };
 

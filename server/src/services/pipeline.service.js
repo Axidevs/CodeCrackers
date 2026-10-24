@@ -8,8 +8,8 @@
 const { CARE_TYPES, URGENCIES } = require("../config/taxonomy");
 const { processIntake } = require("./intake.service");
 const { evaluateSafety } = require("./safetyGate.service");
-const { predictTriage } = require("./mlTriage.service");
-const { matchCaregivers } = require("./caregiverMatching.service");
+const mlTriageService = require("./mlTriage.service");
+const caregiverMatchingService = require("./caregiverMatching.service");
 
 /**
  * Runs the end-to-end CURA navigation pipeline
@@ -96,7 +96,7 @@ async function runPipeline(request, force_final = false) {
   }
 
   // BRANCH C: Final Care Triage & Caregiver Matching
-  const triageResult = await predictTriage({
+  const triageResult = await mlTriageService.predictTriage({
     text: intake.full_text,
     language: intake.language,
     symptoms: intake.symptoms,
@@ -104,7 +104,7 @@ async function runPipeline(request, force_final = false) {
   });
 
   // Perform explainable caregiver matching
-  const matchedCaregivers = matchCaregivers({
+  const matchedCaregivers = caregiverMatchingService.matchCaregivers({
     care_type: triageResult.care_type,
     urgency: triageResult.urgency,
     user_location: request.location,

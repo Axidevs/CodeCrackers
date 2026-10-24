@@ -140,6 +140,7 @@ The backend provides an adapter (`src/services/mlTriage.service.js`) that querie
   "matched_caregivers": []
 }
 ```
+Emergency decisions are returned by the deterministic Safety Gate before the ML adapter or caregiver matcher runs. The `emergency_action` field is included on `POST /api/triage` only when an emergency is detected; routine, follow-up, and UI triage response shapes remain unchanged.
 
 **C. Final Decision with Matched Caregivers**
 ```json
@@ -169,7 +170,7 @@ The backend provides an adapter (`src/services/mlTriage.service.js`) that querie
 ```json
 {
   "caregiver_id": "CG_014",
-  "slot_id": "slot_014_1",
+  "slot_id": "CG_014_0800",
   "patient_name": "Ramesh Kumar"
 }
 ```
@@ -214,3 +215,11 @@ The test suite covers:
 docker compose up --build
 ```
 The backend container runs on port `5001` with an automated health check on `/api/health`.
+
+### Booking Persistence Limitations
+
+Demo bookings are stored in a local JSON overlay. Writes use atomic file replacement, and a failed write returns a structured server error instead of confirming the booking. Duplicate protection is serialized within a single Node.js process only. Separate processes or replicas do not share a lock or transactional store, so this JSON implementation does not guarantee cross-process booking uniqueness. The overlay must be on writable durable storage to survive restarts; ephemeral container filesystems may lose bookings when the container is replaced.
+
+### Caregiver Dataset
+
+`server/data/caregivers.csv` is the default caregiver source. It is validated during startup; malformed rows or missing required headers stop startup rather than generating replacement profiles. Inactive rows are retained in the loaded dataset but omitted from normal caregiver listings and matching. Semicolon-separated languages and skills are parsed as lists, and blank tiers remain `null`. CSV availability provides a daily `free_from`/`free_until` window but no calendar date, so the API exposes an undated window and does not infer a date. Dataset roles are retained: `doctor` can match GP teleconsultation and `medic` can match the existing paramedic-home-visit role; `phlebotomist` currently has no matching care type in the existing taxonomy.

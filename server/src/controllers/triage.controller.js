@@ -30,7 +30,6 @@ async function handleOfficialTriage(req, res, next) {
       matched_caregivers: formattedCaregivers
     };
 
-    // If emergency, include emergency action guidance
     if (decision.emergency_action) {
       responsePayload.emergency_action = decision.emergency_action;
     }

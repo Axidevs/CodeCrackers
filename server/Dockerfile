@@ -16,7 +16,8 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 # Copy application source code
-COPY src/ ./src/
+COPY --chown=node:node src/ ./src/
+COPY --chown=node:node data/caregivers.csv ./data/caregivers.csv
 
 # Create runtime non-root user for security
 USER node

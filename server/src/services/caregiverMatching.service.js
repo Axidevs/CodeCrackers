@@ -32,11 +32,28 @@ function matchCaregivers({ care_type, urgency, user_location, language = "auto",
     return [];
   }
 
+  const isTeleconsult = care_type === CARE_TYPES.GP_TELECONSULT;
+  const hasLocation = user_location !== undefined && user_location !== null;
+  const validUserLocation = Number.isFinite(user_location?.lat) && user_location.lat >= -90 && user_location.lat <= 90 &&
+    Number.isFinite(user_location?.lng) && user_location.lng >= -180 && user_location.lng <= 180;
+  if (!isTeleconsult && hasLocation && !validUserLocation) return [];
+
   const allCaregivers = caregiverDataService.getAll();
   const eligibleCandidates = [];
 
   // 2. Apply Hard Filters (never relaxed)
   for (const cg of allCaregivers) {
+    if (cg.active === false) continue;
+
+    const caregiverLat = cg.location?.lat;
+    const caregiverLng = cg.location?.lng;
+    if (!isTeleconsult) {
+      if (!Number.isFinite(caregiverLat) || caregiverLat < -90 || caregiverLat > 90 ||
+          !Number.isFinite(caregiverLng) || caregiverLng < -180 || caregiverLng > 180) {
+        continue;
+      }
+    }
+
     // Hard Filter 1: Role Compatibility
     const roleMatches = eligibleRoles.some((r) => r.toLowerCase() === (cg.role || "").toLowerCase());
     if (!roleMatches) {
@@ -45,8 +62,13 @@ function matchCaregivers({ care_type, urgency, user_location, language = "auto",
 
     // Hard Filter 2: Free Slot in Urgency Window (minus booked slots)
     const availableSlots = (cg.availability_slots || []).filter(
-      (slot) => slot.status === "available" && !bookingService.isSlotBooked(slot.slot_id)
+      (slot) => slot.status === "available" && bookingService.isSlotAvailable(slot.slot_id)
     );
+    availableSlots.sort((a, b) => {
+      const dateA = a.date || "9999-12-31";
+      const dateB = b.date || "9999-12-31";
+      return dateA.localeCompare(dateB) || (a.time || "99:99").localeCompare(b.time || "99:99");
+    });
 
     if (availableSlots.length === 0) {
       // Ineligible: No free slots
@@ -55,10 +77,18 @@ function matchCaregivers({ care_type, urgency, user_location, language = "auto",
 
     // Hard Filter 3: Skill match (if specific skills strictly required)
     if (required_skills && required_skills.length > 0) {
-      const hasSkill = required_skills.some((sk) => (cg.skills || []).includes(sk));
-      if (!hasSkill) {
+      const hasAllSkills = required_skills.every((skill) => (cg.skills || []).includes(skill));
+      if (!hasAllSkills) {
         continue;
       }
+    }
+
+    if (!isTeleconsult && validUserLocation) {
+      const distance = calculateDistanceKm(user_location.lat, user_location.lng, caregiverLat, caregiverLng);
+      const configuredRadius = cg.service_radius_km;
+      if (!Number.isFinite(configuredRadius) || configuredRadius <= 0) continue;
+      const maximumDistance = Math.min(MATCHING_CONFIG.DEFAULT_MAX_DISTANCE_KM, configuredRadius);
+      if (distance === null || distance > maximumDistance) continue;
     }
 
     eligibleCandidates.push({
@@ -72,10 +102,6 @@ function matchCaregivers({ care_type, urgency, user_location, language = "auto",
     return [];
   }
 
-  const isTeleconsult = care_type === CARE_TYPES.GP_TELECONSULT;
-  const userLat = user_location?.lat;
-  const userLng = user_location?.lng;
-
   // 3. Compute Soft Multi-Criteria Factor Scores
   const scoredCandidates = eligibleCandidates.map(({ caregiver, availableSlots }) => {
     // a. Role / Skill Fit (0 to 1.0)
@@ -83,20 +109,18 @@ function matchCaregivers({ care_type, urgency, user_location, language = "auto",
 
     // b. Availability Factor: Earliest slot
     const earliestSlot = availableSlots[0];
-    const isSameDaySlot = earliestSlot.date === "2026-10-24" || earliestSlot.date === new Date().toISOString().split("T")[0];
+    const isSameDaySlot = earliestSlot.date === new Date().toISOString().split("T")[0];
     const f_avail = urgency === URGENCIES.SAME_DAY ? (isSameDaySlot ? 1.0 : 0.6) : 0.9;
 
     // c. Distance Factor
     let distanceKm = null;
     let f_dist = 1.0;
 
-    if (!isTeleconsult && userLat && userLng && caregiver.location?.lat && caregiver.location?.lng) {
-      distanceKm = calculateDistanceKm(userLat, userLng, caregiver.location.lat, caregiver.location.lng);
+    if (!isTeleconsult && validUserLocation) {
+      distanceKm = calculateDistanceKm(user_location.lat, user_location.lng, caregiver.location.lat, caregiver.location.lng);
       if (distanceKm !== null) {
         // Haversine km -> 1 / (1 + d / d0)
         f_dist = 1.0 / (1.0 + distanceKm / MATCHING_CONFIG.DISTANCE_SCALE_KM);
-      } else {
-        f_dist = 0.6; // neutral default if distance uncomputable
       }
     } else if (isTeleconsult) {
       f_dist = 1.0; // Distance does not penalize teleconsultations
@@ -141,6 +165,8 @@ function matchCaregivers({ care_type, urgency, user_location, language = "auto",
     if (speaksPreferred) {
       const langName = normalizedLang === "english" ? "English" : "Hindi";
       reasonParts.push(`${langName}-speaking`);
+    } else if (normalizedLang === "hindi" || normalizedLang === "hinglish" || normalizedLang === "english") {
+      reasonParts.push(`No ${normalizedLang === "hinglish" ? "Hindi" : normalizedLang} language match`);
     }
 
     if (distanceKm !== null && !isTeleconsult) {
@@ -151,6 +177,7 @@ function matchCaregivers({ care_type, urgency, user_location, language = "auto",
 
     if (earliestSlot) {
       reasonParts.push(`free at ${earliestSlot.time}`);
+      if (earliestSlot.end_time) reasonParts.push(`available until ${earliestSlot.end_time}`);
     }
 
     const reason = reasonParts.join(", ");
@@ -168,8 +195,10 @@ function matchCaregivers({ care_type, urgency, user_location, language = "auto",
     };
   });
 
+  const eligibleByScore = scoredCandidates.filter((candidate) => candidate.score >= MATCHING_CONFIG.MIN_MATCH_SCORE);
+
   // 5. Sort by score descending; tie-break by earliest slot, then caregiver_id
-  scoredCandidates.sort((a, b) => {
+  eligibleByScore.sort((a, b) => {
     if (b.score !== a.score) {
       return b.score - a.score;
     }
@@ -182,7 +211,7 @@ function matchCaregivers({ care_type, urgency, user_location, language = "auto",
   });
 
   // Return Top K recommendations
-  return scoredCandidates.slice(0, MATCHING_CONFIG.MAX_RECOMMENDATIONS);
+  return eligibleByScore.slice(0, MATCHING_CONFIG.MAX_RECOMMENDATIONS);
 }
 
 module.exports = {

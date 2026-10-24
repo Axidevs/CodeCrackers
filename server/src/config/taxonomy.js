@@ -24,8 +24,8 @@ const ALLOWED_URGENCIES = Object.values(URGENCIES);
  * Mapping between care_type and eligible caregiver role in dataset
  */
 const CARE_ROLE_MAP = {
-  [CARE_TYPES.PARAMEDIC_HOME_VISIT]: ["paramedic"],
-  [CARE_TYPES.NURSE_VISIT]: ["nurse"],
+  [CARE_TYPES.PARAMEDIC_HOME_VISIT]: ["paramedic", "medic"],
+  [CARE_TYPES.NURSE_VISIT]: ["nurse", "medic"],
   [CARE_TYPES.GP_TELECONSULT]: ["gp", "general_physician", "doctor"],
   [CARE_TYPES.SPECIALIST_CONSULT]: ["specialist", "consultant"],
   [CARE_TYPES.EMERGENCY_REFERRAL]: [] // No routine caregivers for emergencies

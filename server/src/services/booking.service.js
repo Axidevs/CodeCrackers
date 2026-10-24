@@ -21,20 +21,18 @@ class BookingService {
    * Initializes or loads the booking overlay from disk
    */
   initStore() {
-    try {
-      if (fs.existsSync(this.overlayPath)) {
-        const raw = fs.readFileSync(this.overlayPath, "utf-8");
-        this.bookings = JSON.parse(raw);
-        this.bookedSlots = new Set(this.bookings.map((b) => b.slot_id));
-      } else {
-        this.bookings = [];
-        this.bookedSlots = new Set();
-        this.saveStore();
+    if (fs.existsSync(this.overlayPath)) {
+      const raw = fs.readFileSync(this.overlayPath, "utf-8");
+      const bookings = JSON.parse(raw);
+      if (!Array.isArray(bookings)) {
+        throw new Error(`Booking overlay at ${this.overlayPath} must contain a JSON array`);
       }
-    } catch (err) {
-      console.warn("Could not read booking overlay, initializing empty store:", err.message);
+      this.bookings = bookings;
+      this.bookedSlots = new Set(bookings.map((booking) => booking.slot_id));
+    } else {
       this.bookings = [];
       this.bookedSlots = new Set();
+      this.saveStore();
     }
   }
 
@@ -42,14 +40,21 @@ class BookingService {
    * Persists bookings to disk
    */
   saveStore() {
+    let temporaryPath;
     try {
       const dir = path.dirname(this.overlayPath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(this.overlayPath, JSON.stringify(this.bookings, null, 2), "utf-8");
+      fs.mkdirSync(dir, { recursive: true });
+      temporaryPath = `${this.overlayPath}.${process.pid}.${Date.now()}.tmp`;
+      fs.writeFileSync(temporaryPath, JSON.stringify(this.bookings, null, 2), { encoding: "utf-8", flag: "wx" });
+      fs.renameSync(temporaryPath, this.overlayPath);
     } catch (err) {
-      console.error("Failed to save booking overlay to disk:", err.message);
+      if (temporaryPath) {
+        try {
+          fs.rmSync(temporaryPath, { force: true });
+        } catch {}
+      }
+      err.code = "BOOKING_PERSISTENCE_FAILED";
+      throw err;
     }
   }
 
@@ -58,10 +63,11 @@ class BookingService {
    * @param {string} slotId
    */
   isSlotBooked(slotId) {
-    if (!env.BOOKINGS_AFFECT_AVAILABILITY) {
-      return false;
-    }
     return this.bookedSlots.has(slotId);
+  }
+
+  isSlotAvailable(slotId) {
+    return !env.BOOKINGS_AFFECT_AVAILABILITY || !this.isSlotBooked(slotId);
   }
 
   /**
@@ -88,9 +94,8 @@ class BookingService {
       booked_at: new Date().toISOString()
     };
 
-    this.bookings.push(newBooking);
-    this.bookedSlots.add(slot_id);
-    this.saveStore();
+    const nextBookings = [...this.bookings, newBooking];
+    this.persistBookings(nextBookings);
 
     return {
       success: true,
@@ -110,13 +115,23 @@ class BookingService {
    * Resets all demo bookings (restores original availability)
    */
   resetStore() {
-    this.bookings = [];
-    this.bookedSlots.clear();
-    this.saveStore();
+    this.persistBookings([]);
     return {
       success: true,
       message: "All demo bookings cleared. Original caregiver slot availability restored."
     };
+  }
+
+  persistBookings(bookings) {
+    const previousBookings = this.bookings;
+    this.bookings = bookings;
+    try {
+      this.saveStore();
+      this.bookedSlots = new Set(bookings.map((booking) => booking.slot_id));
+    } catch (err) {
+      this.bookings = previousBookings;
+      throw err;
+    }
   }
 }
 

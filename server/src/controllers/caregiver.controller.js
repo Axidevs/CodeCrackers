@@ -29,7 +29,7 @@ function getCaregivers(req, res, next) {
       ...c,
       availability_slots: (c.availability_slots || []).map((slot) => ({
         ...slot,
-        is_booked: bookingService.isSlotBooked(slot.slot_id)
+        is_booked: !bookingService.isSlotAvailable(slot.slot_id)
       }))
     }));
 
@@ -65,7 +65,7 @@ function getCaregiverById(req, res, next) {
         ...caregiver,
         availability_slots: (caregiver.availability_slots || []).map((slot) => ({
           ...slot,
-          is_booked: bookingService.isSlotBooked(slot.slot_id)
+          is_booked: !bookingService.isSlotAvailable(slot.slot_id)
         }))
       }
     });
@@ -104,7 +104,7 @@ function createBooking(req, res, next) {
       caregiver_id,
       slot_id,
       caregiver_name: caregiver_name || caregiver.name,
-      slot_time: slot_time || `${slot.date} ${slot.time}`,
+      slot_time: slot_time || [slot.date, slot.time].filter(Boolean).join(" "),
       patient_name,
       notes
     });

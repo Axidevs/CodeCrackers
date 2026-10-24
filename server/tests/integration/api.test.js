@@ -1,6 +1,10 @@
 const { test, describe, before, after } = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const app = require("../../src/app");
+const bookingService = require("../../src/services/booking.service");
 
 let server;
 let baseUrl;
@@ -51,6 +55,7 @@ describe("CURA Backend API Integration Tests", () => {
       assert.equal(body.care_type, "paramedic_home_visit");
       assert.equal(body.urgency, "same_day");
       assert.deepEqual(body.red_flags, []);
+      assert.equal(Object.hasOwn(body, "emergency_action"), false);
       assert.ok(typeof body.reasoning === "string" && body.reasoning.length > 0);
       assert.ok(Array.isArray(body.matched_caregivers));
       assert.ok(body.matched_caregivers.length > 0);
@@ -62,6 +67,7 @@ describe("CURA Backend API Integration Tests", () => {
     });
 
     test("EMERGENCY SAFETY GATE: triggers emergency referral and BYPASSES caregiver matching", async () => {
+      const bookingsBefore = bookingService.getAllBookings().length;
       const res = await fetch(`${baseUrl}/api/triage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -81,6 +87,10 @@ describe("CURA Backend API Integration Tests", () => {
       assert.ok(body.red_flags.includes("chest_pain"));
       assert.deepEqual(body.matched_caregivers, [], "Emergencies MUST have empty matched_caregivers list");
       assert.equal(body.emergency_action.call, "112");
+      assert.equal(body.emergency_action.ambulance, "108");
+      assert.ok(body.emergency_action.guidance);
+      assert.ok(Array.isArray(body.emergency_action.steps));
+      assert.equal(bookingService.getAllBookings().length, bookingsBefore);
     });
 
     test("NEGATION SAFETY: 'chest pain nahi hai' is NOT treated as an emergency", async () => {
@@ -151,17 +161,38 @@ describe("CURA Backend API Integration Tests", () => {
       assert.ok(body.trace);
       assert.ok(typeof body.trace.latency_ms === "number");
     });
+
+    test("emergency decisions retain the UI decision and trace envelope", async () => {
+      const response = await fetch(`${baseUrl}/api/ui/triage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_input: "Patient is unconscious", language: "english" })
+      });
+      const body = await response.json();
+      assert.equal(response.status, 200);
+      assert.equal(body.success, true);
+      assert.equal(body.decision.care_type, "emergency_referral");
+      assert.equal(body.decision.emergency_action.call, "112");
+      assert.equal(body.trace.branch, "emergency");
+    });
   });
 
   describe("Caregiver & Booking APIs", () => {
     test("GET /api/caregivers returns available profiles and supports role filtering", async () => {
-      const res = await fetch(`${baseUrl}/api/caregivers?role=nurse`);
+      const allResponse = await fetch(`${baseUrl}/api/caregivers`);
+      const allBody = await allResponse.json();
+      assert.equal(allResponse.status, 200);
+      assert.equal(allBody.count, 52);
+
+      const res = await fetch(`${baseUrl}/api/caregivers?role=medic`);
       assert.equal(res.status, 200);
       const body = await res.json();
       assert.equal(body.success, true);
       assert.ok(body.count > 0);
+      assert.equal(body.count, 23);
       for (const cg of body.caregivers) {
-        assert.equal(cg.role, "nurse");
+        assert.equal(cg.role, "medic");
+        assert.equal(cg.active, true);
       }
     });
 
@@ -204,6 +235,48 @@ describe("CURA Backend API Integration Tests", () => {
       // 4. Reset bookings
       const resetRes = await fetch(`${baseUrl}/api/demo/reset`, { method: "POST" });
       assert.equal(resetRes.status, 200);
+    });
+
+    test("concurrent duplicate booking requests produce one confirmation and one conflict", async () => {
+      const caregiverResponse = await fetch(`${baseUrl}/api/caregivers/CG_014`);
+      const caregiverBody = await caregiverResponse.json();
+      const slot = caregiverBody.caregiver.availability_slots.find((item) => !item.is_booked);
+      assert.ok(slot);
+
+      const makeRequest = () => fetch(`${baseUrl}/api/booking`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caregiver_id: "CG_014", slot_id: slot.slot_id })
+      });
+      const responses = await Promise.all([makeRequest(), makeRequest()]);
+
+      assert.deepEqual(responses.map((response) => response.status).sort(), [201, 409]);
+      await fetch(`${baseUrl}/api/demo/reset`, { method: "POST" });
+    });
+
+    test("booking persistence failure returns a structured error without confirming", async () => {
+      const caregiverResponse = await fetch(`${baseUrl}/api/caregivers/CG_014`);
+      const caregiverBody = await caregiverResponse.json();
+      const slot = caregiverBody.caregiver.availability_slots.find((item) => !item.is_booked);
+      const originalOverlayPath = bookingService.overlayPath;
+      const directoryPath = fs.mkdtempSync(path.join(os.tmpdir(), "cura-booking-error-"));
+
+      try {
+        bookingService.overlayPath = directoryPath;
+        const response = await fetch(`${baseUrl}/api/booking`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ caregiver_id: "CG_014", slot_id: slot.slot_id })
+        });
+        const body = await response.json();
+        assert.equal(response.status, 500);
+        assert.equal(body.success, false);
+        assert.equal(body.error.code, "BOOKING_PERSISTENCE_FAILED");
+        assert.equal(bookingService.isSlotBooked(slot.slot_id), false);
+      } finally {
+        bookingService.overlayPath = originalOverlayPath;
+        fs.rmSync(directoryPath, { recursive: true, force: true });
+      }
     });
   });
 
