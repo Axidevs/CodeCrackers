@@ -1,7 +1,6 @@
 const app = require("./app");
+const env = require("./config/env");
 
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`CURA server running on port ${PORT}`);
+app.listen(env.PORT, () => {
+  console.log(`CURA server running on port ${env.PORT}`);
 });
