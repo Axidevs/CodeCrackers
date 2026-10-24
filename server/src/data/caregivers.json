@@ -1,0 +1,148 @@
+[
+  {
+    "caregiver_id": "CG_001",
+    "name": "Dr. Rajesh Kumar",
+    "role": "gp",
+    "skills": ["general_medicine", "teleconsultation", "pediatrics", "chronic_disease_management"],
+    "location": {
+      "lat": 28.5355,
+      "lng": 77.2690,
+      "address": "Greater Kailash, New Delhi"
+    },
+    "availability_slots": [
+      { "slot_id": "slot_001_1", "date": "2026-10-24", "time": "15:00", "status": "available" },
+      { "slot_id": "slot_001_2", "date": "2026-10-24", "time": "17:30", "status": "available" },
+      { "slot_id": "slot_001_3", "date": "2026-10-25", "time": "10:00", "status": "available" }
+    ],
+    "languages": ["Hindi", "English"],
+    "rating": 4.9,
+    "rating_count": 210
+  },
+  {
+    "caregiver_id": "CG_014",
+    "name": "Sunita Sharma",
+    "role": "paramedic",
+    "skills": ["vital_signs", "emergency_first_aid", "iv_fluids", "wound_dressing", "oxygen_support"],
+    "location": {
+      "lat": 28.5420,
+      "lng": 77.2745,
+      "address": "Okhla Industrial Area, New Delhi"
+    },
+    "availability_slots": [
+      { "slot_id": "slot_014_1", "date": "2026-10-24", "time": "16:00", "status": "available" },
+      { "slot_id": "slot_014_2", "date": "2026-10-24", "time": "18:00", "status": "available" },
+      { "slot_id": "slot_014_3", "date": "2026-10-25", "time": "11:00", "status": "available" }
+    ],
+    "languages": ["Hindi", "English"],
+    "rating": 4.8,
+    "rating_count": 142
+  },
+  {
+    "caregiver_id": "CG_003",
+    "name": "Sister Mary Thomas",
+    "role": "nurse",
+    "skills": ["home_nursing", "injections", "wound_dressing", "vital_signs", "post_op_care", "elderly_care"],
+    "location": {
+      "lat": 28.5490,
+      "lng": 77.2710,
+      "address": "Nehru Place, New Delhi"
+    },
+    "availability_slots": [
+      { "slot_id": "slot_003_1", "date": "2026-10-24", "time": "16:30", "status": "available" },
+      { "slot_id": "slot_003_2", "date": "2026-10-24", "time": "19:00", "status": "available" },
+      { "slot_id": "slot_003_3", "date": "2026-10-25", "time": "09:30", "status": "available" }
+    ],
+    "languages": ["English", "Hindi", "Malayalam"],
+    "rating": 4.9,
+    "rating_count": 185
+  },
+  {
+    "caregiver_id": "CG_004",
+    "name": "Vikram Singh",
+    "role": "paramedic",
+    "skills": ["emergency_first_aid", "vital_signs", "patient_transfer", "cpr"],
+    "location": {
+      "lat": 28.5672,
+      "lng": 77.2435,
+      "address": "Lajpat Nagar, New Delhi"
+    },
+    "availability_slots": [
+      { "slot_id": "slot_004_1", "date": "2026-10-24", "time": "17:00", "status": "available" },
+      { "slot_id": "slot_004_2", "date": "2026-10-25", "time": "14:00", "status": "available" }
+    ],
+    "languages": ["Hindi", "Punjabi"],
+    "rating": 4.6,
+    "rating_count": 78
+  },
+  {
+    "caregiver_id": "CG_005",
+    "name": "Dr. Ananya Sen",
+    "role": "specialist",
+    "skills": ["pulmonology", "respiratory_medicine", "teleconsultation", "asthma_care"],
+    "location": {
+      "lat": 28.5244,
+      "lng": 77.2066,
+      "address": "Saket, New Delhi"
+    },
+    "availability_slots": [
+      { "slot_id": "slot_005_1", "date": "2026-10-24", "time": "18:30", "status": "available" },
+      { "slot_id": "slot_005_2", "date": "2026-10-25", "time": "11:30", "status": "available" }
+    ],
+    "languages": ["English", "Hindi", "Bengali"],
+    "rating": 4.95,
+    "rating_count": 320
+  },
+  {
+    "caregiver_id": "CG_006",
+    "name": "Pooja Verma",
+    "role": "nurse",
+    "skills": ["pediatric_nursing", "vaccination", "vital_signs", "elderly_care"],
+    "location": {
+      "lat": 28.5300,
+      "lng": 77.2900,
+      "address": "Jasola, New Delhi"
+    },
+    "availability_slots": [
+      { "slot_id": "slot_006_1", "date": "2026-10-24", "time": "15:30", "status": "available" },
+      { "slot_id": "slot_006_2", "date": "2026-10-25", "time": "12:00", "status": "available" }
+    ],
+    "languages": ["Hindi"],
+    "rating": 4.7,
+    "rating_count": 92
+  },
+  {
+    "caregiver_id": "CG_007",
+    "name": "Dr. Farhan Ali",
+    "role": "gp",
+    "skills": ["general_medicine", "elderly_care", "fever_management", "teleconsultation"],
+    "location": {
+      "lat": 28.5500,
+      "lng": 77.2500,
+      "address": "Kalkaji, New Delhi"
+    },
+    "availability_slots": [
+      { "slot_id": "slot_007_1", "date": "2026-10-24", "time": "16:00", "status": "available" },
+      { "slot_id": "slot_007_2", "date": "2026-10-24", "time": "20:00", "status": "available" }
+    ],
+    "languages": ["Hindi", "English", "Urdu"],
+    "rating": 4.85,
+    "rating_count": 160
+  },
+  {
+    "caregiver_id": "CG_008",
+    "name": "Dr. Meenakshi Sundaram",
+    "role": "specialist",
+    "skills": ["cardiology", "internal_medicine", "hypertension_care"],
+    "location": {
+      "lat": 28.5600,
+      "lng": 77.2200,
+      "address": "Hauz Khas, New Delhi"
+    },
+    "availability_slots": [
+      { "slot_id": "slot_008_1", "date": "2026-10-25", "time": "15:00", "status": "available" }
+    ],
+    "languages": ["English", "Tamil", "Hindi"],
+    "rating": 4.92,
+    "rating_count": 280
+  }
+]
