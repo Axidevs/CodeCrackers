@@ -1,0 +1,6 @@
+,emergency_112,home_nursing,lab_test_home,paramedic_home_visit,teleconsultation
+emergency_112,9,0,0,0,0
+home_nursing,0,16,0,0,0
+lab_test_home,0,0,8,0,0
+paramedic_home_visit,0,0,0,6,0
+teleconsultation,0,0,0,0,7
