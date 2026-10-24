@@ -42,28 +42,48 @@ CURA/
         └── integration/     # End-to-end API integration tests
 ```
 
+The Python inference service and saved model live under `ml/`. See
+[`ml/INTEGRATION.md`](ml/INTEGRATION.md) for its HTTP contract, dependency versions, and limitations.
+
 ---
 
 ## Quickstart
 
+### Running the Python ML Service Locally
+Create an environment and install the artifact-compatible runtime dependencies:
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r ml\requirements.txt
+.\.venv\Scripts\python.exe -m ml.service
+```
+The Python service listens on `http://localhost:8000` by default.
+
 ### Running the Backend Locally
+Start the Python ML service in another terminal first, then run:
 ```bash
 cd server
-npm install
+npm ci
 npm run dev
 ```
 The server will run on port `5001`.
 
 ### Running the Complete Application Locally
 
-Use two terminals. Start the backend first:
+Use three terminals. Start the Python ML service, the backend, and the frontend:
+
+Terminal 1:
+```powershell
+.\.venv\Scripts\python.exe -m ml.service
+```
+
+Terminal 2:
 ```bash
 cd server
 npm install
 npm run dev
 ```
 
-Then start the frontend on port `3000`:
+Terminal 3:
 ```bash
 cd cura
 corepack pnpm install --frozen-lockfile

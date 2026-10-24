@@ -1,151 +1,178 @@
 /**
- * CURA AI/ML Service Integration Adapter (Member 1 Integration)
- * Calls Member 1's Python ML microservice via HTTP with timeouts and schema validation.
- * Includes a deterministic fallback mock predictor to ensure zero runtime crashes
- * and enable seamless development when the ML service is offline.
+ * CURA adapter for the Python inference HTTP service.
+ * Prediction failures are surfaced; production never substitutes a mock result.
  */
 
 const env = require("../config/env");
-const { CARE_TYPES, URGENCIES, ALLOWED_CARE_TYPES, ALLOWED_URGENCIES } = require("../config/taxonomy");
-const { normalizeText } = require("../utils/textNormalizer");
 
-/**
- * Predicts care type and urgency by delegating to Member 1's ML service
- * with automatic fallback if offline.
- *
- * @param {object} params
- * @param {string} params.text - User text input
- * @param {string} params.language - Language ('hindi', 'english', 'hinglish')
- * @param {string[]} params.symptoms - Detected symptom list
- * @param {string} [params.duration] - Symptom duration
- * @returns {Promise<object>} { care_type, urgency, confidence, reasoning, source }
- */
-async function predictTriage({ text, language, symptoms = [], duration = null }) {
-  // Try calling Member 1's Python ML microservice
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), env.ML_SERVICE_TIMEOUT_MS);
+const CARE_TYPE_MAP = {
+  paramedic_home_visit: "paramedic_home_visit",
+  home_nursing: "nurse_visit",
+  teleconsultation: "gp_teleconsult",
+  emergency_112: "emergency_referral"
+};
+const URGENCY_MAP = {
+  emergency: "immediate",
+  same_day: "same_day",
+  scheduled: "routine",
+  null: null
+};
+const PYTHON_CARE_TYPES = new Set([
+  ...Object.keys(CARE_TYPE_MAP),
+  "lab_test_home",
+  null
+]);
+const PYTHON_URGENCIES = new Set(["emergency", "same_day", "scheduled", null]);
 
-    const response = await fetch(env.ML_SERVICE_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text,
-        language,
-        symptoms,
-        duration
-      }),
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (response.ok) {
-      const data = await response.json();
-
-      // Validate taxonomy constraints
-      const care_type = ALLOWED_CARE_TYPES.includes(data.care_type)
-        ? data.care_type
-        : CARE_TYPES.GP_TELECONSULT;
-
-      const urgency = ALLOWED_URGENCIES.includes(data.urgency)
-        ? data.urgency
-        : URGENCIES.SAME_DAY;
-
-      return {
-        care_type,
-        urgency,
-        confidence: typeof data.confidence === "number" ? data.confidence : 0.85,
-        reasoning: data.reasoning || generateGroundedReasoning(care_type, urgency, symptoms, duration),
-        source: "ml_service"
-      };
-    }
-  } catch (err) {
-    // Expected when Member 1's service is not yet running locally or timed out
-    // Fall back to robust rule-based mock predictor
+class MlServiceError extends Error {
+  constructor(statusCode, code, message) {
+    super(message);
+    this.name = "MlServiceError";
+    this.statusCode = statusCode;
+    this.code = code;
   }
-
-  // Graceful Mock Fallback Predictor (strictly follows official taxonomy)
-  return runFallbackMockPredictor({ text, symptoms, duration });
 }
 
-/**
- * Deterministic Fallback Mock Predictor
- * Maps structured symptoms to official taxonomy categories without inventing labels.
- */
-function runFallbackMockPredictor({ text, symptoms = [], duration = null }) {
-  const normalized = normalizeText(text);
+function invalidUpstreamResponse() {
+  return new MlServiceError(
+    502,
+    "ML_SERVICE_INVALID_RESPONSE",
+    "The ML service returned an invalid response."
+  );
+}
 
-  let care_type = CARE_TYPES.GP_TELECONSULT;
-  let urgency = URGENCIES.ROUTINE;
-  let confidence = 0.85;
-
-  // Wound care, nursing, injections, bedridden elder -> Nurse visit
-  if (symptoms.includes("wound_care") || /\b(?:injection|dressing|bandage|saline|bedridden|iv)\b/i.test(normalized)) {
-    care_type = CARE_TYPES.NURSE_VISIT;
-    urgency = URGENCIES.SAME_DAY;
+function validateMlResponse(data) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw invalidUpstreamResponse();
   }
-  // Moderate fever + cough with home attendance need -> Paramedic home visit
-  else if (symptoms.includes("fever") && (symptoms.includes("cough") || duration)) {
-    care_type = CARE_TYPES.PARAMEDIC_HOME_VISIT;
-    urgency = URGENCIES.SAME_DAY;
+  const requiredFields = [
+    "follow_up_question",
+    "care_type",
+    "urgency",
+    "red_flags",
+    "reasoning",
+    "matched_caregivers"
+  ];
+  if (requiredFields.some((field) => !Object.hasOwn(data, field))) {
+    throw invalidUpstreamResponse();
   }
-  // High fever or ongoing fever -> Paramedic home visit
-  else if (symptoms.includes("fever")) {
-    care_type = CARE_TYPES.PARAMEDIC_HOME_VISIT;
-    urgency = URGENCIES.SAME_DAY;
-  }
-  // Specific chronic or specialized care mentions -> Specialist consult
-  else if (/\b(?:diabetes|cardio|heart|asthma|lungs|kidney|ortho|bone)\b/i.test(normalized)) {
-    care_type = CARE_TYPES.SPECIALIST_CONSULT;
-    urgency = URGENCIES.ROUTINE;
-  }
-  // Default routine complaints -> GP Teleconsult
-  else {
-    care_type = CARE_TYPES.GP_TELECONSULT;
-    urgency = URGENCIES.ROUTINE;
+  if (
+    (data.follow_up_question !== null && typeof data.follow_up_question !== "string") ||
+    !PYTHON_CARE_TYPES.has(data.care_type) ||
+    !PYTHON_URGENCIES.has(data.urgency) ||
+    !Array.isArray(data.red_flags) ||
+    data.red_flags.some((flag) => typeof flag !== "string") ||
+    typeof data.reasoning !== "string" ||
+    !Array.isArray(data.matched_caregivers)
+  ) {
+    throw invalidUpstreamResponse();
   }
 
-  const reasoning = generateGroundedReasoning(care_type, urgency, symptoms, duration);
+  if (data.care_type === null) {
+    if (!data.follow_up_question || data.urgency !== null || data.red_flags.length > 0) {
+      throw invalidUpstreamResponse();
+    }
+  } else if (data.follow_up_question !== null) {
+    throw invalidUpstreamResponse();
+  }
+
+  if (data.red_flags.length > 0 && data.care_type !== "emergency_112") {
+    throw invalidUpstreamResponse();
+  }
+  if (data.care_type === "emergency_112") {
+    if (data.urgency !== "emergency" || data.matched_caregivers.length !== 0) {
+      throw invalidUpstreamResponse();
+    }
+  } else if (data.urgency === "emergency") {
+    throw invalidUpstreamResponse();
+  }
+  if (data.matched_caregivers.length !== 0) {
+    throw invalidUpstreamResponse();
+  }
+
+  if (data.care_type === "lab_test_home") {
+    throw new MlServiceError(
+      502,
+      "UNSUPPORTED_ML_CARE_TYPE",
+      "The ML care type is not supported by the backend taxonomy."
+    );
+  }
 
   return {
-    care_type,
-    urgency,
-    confidence,
-    reasoning,
-    source: "ml_fallback_mock"
+    care_type: data.care_type === null ? null : CARE_TYPE_MAP[data.care_type],
+    urgency: URGENCY_MAP[String(data.urgency)],
+    follow_up_question: data.follow_up_question,
+    red_flags: data.red_flags,
+    reasoning: data.reasoning,
+    source: "ml_service"
   };
 }
 
+function logServiceFailure(reason, errorType) {
+  console.error("[mlTriage] Python ML request failed", { reason, errorType });
+}
+
 /**
- * Generates transparent, non-diagnostic reasoning grounded in symptoms and duration
+ * Calls the configured Python service with the existing intake fields.
+ * Only `text` is used by the current trained model; the remaining values are
+ * retained in the transport contract for compatibility and observability.
  */
-function generateGroundedReasoning(care_type, urgency, symptoms, duration) {
-  const parts = [];
+async function predictTriage(
+  { text, language, symptoms = [], duration = null },
+  { fetchImpl = globalThis.fetch, timeoutMs = env.ML_SERVICE_TIMEOUT_MS } = {}
+) {
+  if (typeof text !== "string" || !text.trim()) {
+    throw new MlServiceError(422, "INVALID_ML_REQUEST", "A non-empty triage message is required.");
+  }
 
-  if (symptoms.length > 0) {
-    parts.push(`Symptoms reported: ${symptoms.join(", ")}`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  let response;
+  let data;
+  try {
+    response = await fetchImpl(env.ML_SERVICE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, language, symptoms, duration }),
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      logServiceFailure(`HTTP_${response.status}`, "UpstreamHttpError");
+      throw new MlServiceError(
+        503,
+        "ML_SERVICE_UNAVAILABLE",
+        "The ML service is temporarily unavailable."
+      );
+    }
+    try {
+      data = await response.json();
+    } catch (error) {
+      if (controller.signal.aborted) throw error;
+      logServiceFailure("INVALID_JSON", error?.name || "SyntaxError");
+      throw invalidUpstreamResponse();
+    }
+  } catch (error) {
+    if (error instanceof MlServiceError) throw error;
+    const timedOut = controller.signal.aborted;
+    const code = timedOut ? "ML_SERVICE_TIMEOUT" : "ML_SERVICE_UNAVAILABLE";
+    const message = timedOut
+      ? "The ML service did not respond in time."
+      : "The ML service is unavailable.";
+    logServiceFailure(code, error?.name || "Error");
+    throw new MlServiceError(503, code, message);
+  } finally {
+    clearTimeout(timeoutId);
   }
-  if (duration) {
-    parts.push(`duration: ${duration}`);
-  }
-  parts.push("no acute breathing distress reported");
 
-  const symptomsSummary = parts.length > 0 ? parts.join("; ") : "Non-emergency health consultation";
-
-  if (care_type === CARE_TYPES.PARAMEDIC_HOME_VISIT) {
-    return `${symptomsSummary}. Suitable for home attendance and vital checks by a paramedic today.`;
+  try {
+    return validateMlResponse(data);
+  } catch (error) {
+    logServiceFailure(error.code || "INVALID_SCHEMA", error.name || "Error");
+    throw error;
   }
-  if (care_type === CARE_TYPES.NURSE_VISIT) {
-    return `${symptomsSummary}. Requires in-person nursing attendance.`;
-  }
-  if (care_type === CARE_TYPES.SPECIALIST_CONSULT) {
-    return `${symptomsSummary}. Specialist consultation recommended for further assessment.`;
-  }
-  return `${symptomsSummary}. A general physician can review symptoms via teleconsultation.`;
 }
 
 module.exports = {
-  predictTriage,
-  runFallbackMockPredictor
+  MlServiceError,
+  predictTriage
 };

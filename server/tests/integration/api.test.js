@@ -3,13 +3,40 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const http = require("node:http");
 const app = require("../../src/app");
 const bookingService = require("../../src/services/booking.service");
+const env = require("../../src/config/env");
 
 let server;
+let mlServer;
 let baseUrl;
+let originalMlServiceUrl;
+const mlRequests = [];
 
 before(async () => {
+  originalMlServiceUrl = env.ML_SERVICE_URL;
+  mlServer = http.createServer((req, res) => {
+    let body = "";
+    req.setEncoding("utf8");
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      mlRequests.push(JSON.parse(body));
+      const response = {
+        follow_up_question: null,
+        care_type: "paramedic_home_visit",
+        urgency: null,
+        red_flags: [],
+        reasoning: "Test-only Python service response.",
+        matched_caregivers: []
+      };
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(response));
+    });
+  });
+  await new Promise((resolve) => mlServer.listen(0, "127.0.0.1", resolve));
+  env.ML_SERVICE_URL = `http://127.0.0.1:${mlServer.address().port}/predict`;
+
   await new Promise((resolve) => {
     server = app.listen(0, () => {
       const port = server.address().port;
@@ -21,6 +48,8 @@ before(async () => {
 
 after(async () => {
   await new Promise((resolve) => server.close(resolve));
+  await new Promise((resolve) => mlServer.close(resolve));
+  env.ML_SERVICE_URL = originalMlServiceUrl;
 });
 
 describe("CURA Backend API Integration Tests", () => {
@@ -53,7 +82,7 @@ describe("CURA Backend API Integration Tests", () => {
       // Official schema verification (PS Page 4)
       assert.equal(body.follow_up_question, null);
       assert.equal(body.care_type, "paramedic_home_visit");
-      assert.equal(body.urgency, "same_day");
+      assert.equal(body.urgency, null, "No urgency classifier is present in the Python module");
       assert.deepEqual(body.red_flags, []);
       assert.equal(Object.hasOwn(body, "emergency_action"), false);
       assert.ok(typeof body.reasoning === "string" && body.reasoning.length > 0);
@@ -68,6 +97,7 @@ describe("CURA Backend API Integration Tests", () => {
 
     test("EMERGENCY SAFETY GATE: triggers emergency referral and BYPASSES caregiver matching", async () => {
       const bookingsBefore = bookingService.getAllBookings().length;
+      const mlRequestsBefore = mlRequests.length;
       const res = await fetch(`${baseUrl}/api/triage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -91,6 +121,7 @@ describe("CURA Backend API Integration Tests", () => {
       assert.ok(body.emergency_action.guidance);
       assert.ok(Array.isArray(body.emergency_action.steps));
       assert.equal(bookingService.getAllBookings().length, bookingsBefore);
+      assert.equal(mlRequests.length, mlRequestsBefore, "Emergency must bypass the Python service");
     });
 
     test("NEGATION SAFETY: 'chest pain nahi hai' is NOT treated as an emergency", async () => {
@@ -143,6 +174,7 @@ describe("CURA Backend API Integration Tests", () => {
     });
 
     test("rejects meaningless symptom input with a structured 400 response", async () => {
+      const mlRequestsBefore = mlRequests.length;
       for (const user_input of ["2+2", "hello", "asdfghjkl", "ieoepep", "123456", "!!!@@@", "   ", "What is the weather tomorrow?", "What is fever?", "Does fever cause cough?"]) {
         const response = await fetch(`${baseUrl}/api/triage`, {
           method: "POST",
@@ -155,6 +187,7 @@ describe("CURA Backend API Integration Tests", () => {
         assert.equal(body.error.code, "INVALID_HEALTH_INPUT");
         assert.match(body.error.message, /describe a health concern or symptom/i);
       }
+      assert.equal(mlRequests.length, mlRequestsBefore, "Invalid inputs must bypass the Python service");
     });
 
     test("rejects meaningless input through the UI triage endpoint too", async () => {

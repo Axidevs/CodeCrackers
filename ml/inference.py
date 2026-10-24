@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import sys
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -27,6 +28,7 @@ MODEL_PATH = PROJECT_ROOT / "ml" / "models" / "care_type_pipeline.joblib"
 
 # Internal cache for loaded pipeline
 _pipeline_cache: Optional["Pipeline"] = None
+_pipeline_lock = threading.Lock()
 
 _NEGATED_OR_HISTORICAL_PREFIX = re.compile(
     r"\b(?:no|not|never|denies|denied|without|history of|past history of|previously|had)"
@@ -99,9 +101,11 @@ def load_pipeline() -> "Pipeline":
     """Load the saved TF-IDF + LogisticRegression pipeline. Caches after first load."""
     global _pipeline_cache
     if _pipeline_cache is None:
-        if not MODEL_PATH.exists():
-            raise FileNotFoundError(f"Model not found at {MODEL_PATH}. Run training first.")
-        _pipeline_cache = joblib.load(MODEL_PATH)
+        with _pipeline_lock:
+            if _pipeline_cache is None:
+                if not MODEL_PATH.exists():
+                    raise FileNotFoundError(f"Model not found at {MODEL_PATH}. Run training first.")
+                _pipeline_cache = joblib.load(MODEL_PATH)
     return _pipeline_cache
 
 

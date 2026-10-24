@@ -11,6 +11,7 @@ const { evaluateSafety } = require("./safetyGate.service");
 const mlTriageService = require("./mlTriage.service");
 const caregiverMatchingService = require("./caregiverMatching.service");
 const { hasHealthConcernInConversation } = require("../utils/healthInput");
+const { EMERGENCY_PROTOCOL } = require("../config/safetyRules");
 
 const INVALID_HEALTH_INPUT_MESSAGE = "Please describe a health concern or symptom so CURA can assist you. You can describe what you or someone else is experiencing in English, Hindi, or Hinglish.";
 
@@ -112,6 +113,61 @@ async function runPipeline(request, force_final = false) {
     symptoms: intake.symptoms,
     duration: intake.duration
   });
+
+  if (triageResult.follow_up_question) {
+    const latencyMs = Date.now() - startTime;
+    const decision = {
+      follow_up_question: triageResult.follow_up_question,
+      care_type: null,
+      urgency: null,
+      red_flags: [],
+      reasoning: triageResult.reasoning,
+      matched_caregivers: []
+    };
+    return {
+      decision,
+      trace: {
+        request_id: requestId,
+        branch: "follow_up",
+        latency_ms: latencyMs,
+        language: intake.language,
+        safety_state: safetyResult.state,
+        source: triageResult.source
+      }
+    };
+  }
+
+  if (
+    triageResult.care_type === CARE_TYPES.EMERGENCY_REFERRAL ||
+    triageResult.urgency === URGENCIES.IMMEDIATE
+  ) {
+    const latencyMs = Date.now() - startTime;
+    const decision = {
+      follow_up_question: null,
+      care_type: CARE_TYPES.EMERGENCY_REFERRAL,
+      urgency: URGENCIES.IMMEDIATE,
+      red_flags: triageResult.red_flags || [],
+      reasoning: triageResult.reasoning,
+      emergency_action: {
+        primary_number: EMERGENCY_PROTOCOL.primary_number,
+        ambulance_number: EMERGENCY_PROTOCOL.ambulance_number,
+        instructions: EMERGENCY_PROTOCOL.steps
+      },
+      matched_caregivers: []
+    };
+    return {
+      decision,
+      trace: {
+        request_id: requestId,
+        branch: "emergency",
+        latency_ms: latencyMs,
+        language: intake.language,
+        safety_state: safetyResult.state,
+        red_flags: decision.red_flags,
+        source: triageResult.source
+      }
+    };
+  }
 
   // Perform explainable caregiver matching
   const matchedCaregivers = caregiverMatchingService.matchCaregivers({
