@@ -78,28 +78,38 @@ function processIntake({ user_input, language = "auto", conversation_history = [
   const fullConversationText = [...pastUserMessages, user_input].join(" ");
   const normalizedFull = normalizeText(fullConversationText);
 
-  // Count assistant follow-up questions already asked
-  const questionsAskedCount = (conversation_history || []).filter((msg) => msg.role === "assistant" && msg.is_question).length;
+  // Identify prior bank questions by their localized text so the backend does not repeat them.
+  const priorQuestionMessages = (conversation_history || [])
+    .filter((msg) => msg.role === "assistant" && msg.is_question)
+    .map((msg) => normalizeText(msg.content));
+  const askedQuestionIds = new Set(
+    QUESTION_BANK
+      .filter((question) => [question.text_en, question.text_hi, question.text_hinglish]
+        .some((text) => priorQuestionMessages.includes(normalizeText(text))))
+      .map((question) => question.id)
+  );
+  const questionsAskedCount = priorQuestionMessages.length;
 
   const symptoms = extractSymptoms(normalizedFull);
   const patient = extractPatientProxy(normalizedFull);
   const duration = extractDuration(normalizedFull);
 
-  // Determine if a follow-up question is warranted
+  // Select only fixed, localized questions relevant to extracted symptoms and not already asked.
   let followUpQuestion = null;
 
   // RULE: Obvious emergencies NEVER receive follow-up delays
   if (!has_emergency_red_flag && questionsAskedCount < MAX_QUESTION_BUDGET) {
-    // Check if breathing check has been done
-    const hasBreathingMention = /saans|breath/i.test(normalizedFull);
-    const hasDurationMention = duration !== null;
+    const relevantQuestionIds = [];
+    const hasBreathingOrChestMention = /saans|breath|respirat|chest|seene|sine|छाती|सीने/i.test(normalizedFull);
+    if (!hasBreathingOrChestMention && symptoms.some((symptom) => ["respiratory", "chest", "fever", "cough"].includes(symptom))) {
+      relevantQuestionIds.push("breathing_or_chest_check");
+    }
+    if (duration === null) relevantQuestionIds.push("symptom_duration");
 
-    if (!hasBreathingMention && symptoms.length > 0) {
-      const q = QUESTION_BANK.find((item) => item.id === "breathing_or_chest_check");
-      followUpQuestion = selectLocalizedQuestion(q, detectedLang);
-    } else if (!hasDurationMention && symptoms.length > 0) {
-      const q = QUESTION_BANK.find((item) => item.id === "symptom_duration");
-      followUpQuestion = selectLocalizedQuestion(q, detectedLang);
+    const nextQuestionId = relevantQuestionIds.find((questionId) => !askedQuestionIds.has(questionId));
+    if (nextQuestionId) {
+      const question = QUESTION_BANK.find((item) => item.id === nextQuestionId);
+      followUpQuestion = selectLocalizedQuestion(question, detectedLang);
     }
   }
 

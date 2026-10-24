@@ -10,6 +10,9 @@ const { processIntake } = require("./intake.service");
 const { evaluateSafety } = require("./safetyGate.service");
 const mlTriageService = require("./mlTriage.service");
 const caregiverMatchingService = require("./caregiverMatching.service");
+const { hasHealthConcernInConversation } = require("../utils/healthInput");
+
+const INVALID_HEALTH_INPUT_MESSAGE = "Please describe a health concern or symptom so CURA can assist you. You can describe what you or someone else is experiencing in English, Hindi, or Hinglish.";
 
 /**
  * Runs the end-to-end CURA navigation pipeline
@@ -28,6 +31,13 @@ async function runPipeline(request, force_final = false) {
 
   const userInput = request.user_input || "";
   const conversationHistory = request.conversation_history || [];
+
+  if (!hasHealthConcernInConversation(userInput, conversationHistory)) {
+    const error = new Error(INVALID_HEALTH_INPUT_MESSAGE);
+    error.statusCode = 400;
+    error.code = "INVALID_HEALTH_INPUT";
+    throw error;
+  }
 
   // Step 1: Pre-scan for emergency to know if follow-up should be suppressed
   const initialSafety = evaluateSafety(userInput);

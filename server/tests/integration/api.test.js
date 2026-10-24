@@ -141,6 +141,62 @@ describe("CURA Backend API Integration Tests", () => {
       assert.equal(body.success, false);
       assert.equal(body.error.code, "VALIDATION_ERROR");
     });
+
+    test("rejects meaningless symptom input with a structured 400 response", async () => {
+      for (const user_input of ["2+2", "hello", "asdfghjkl", "ieoepep", "123456", "!!!@@@", "   ", "What is the weather tomorrow?", "What is fever?", "Does fever cause cough?"]) {
+        const response = await fetch(`${baseUrl}/api/triage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_input, language: "auto" })
+        });
+        const body = await response.json();
+        assert.equal(response.status, 400, user_input);
+        assert.equal(body.success, false);
+        assert.equal(body.error.code, "INVALID_HEALTH_INPUT");
+        assert.match(body.error.message, /describe a health concern or symptom/i);
+      }
+    });
+
+    test("rejects meaningless input through the UI triage endpoint too", async () => {
+      const response = await fetch(`${baseUrl}/api/ui/triage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_input: "2+2", language: "english" })
+      });
+      const body = await response.json();
+      assert.equal(response.status, 400);
+      assert.equal(body.success, false);
+      assert.equal(body.error.code, "INVALID_HEALTH_INPUT");
+    });
+
+    test("UI triage rejects meaningless input through its direct API route", async () => {
+      for (const user_input of ["2+2", "hello", "asdfghjkl", "ieoepep", "123456", "!!!@@@", "   "]) {
+        const response = await fetch(`${baseUrl}/api/ui/triage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_input, language: "english" })
+        });
+        const body = await response.json();
+        assert.equal(response.status, 400, user_input);
+        assert.equal(body.error.code, "INVALID_HEALTH_INPUT");
+      }
+    });
+
+    test("accepts a short follow-up answer when prior conversation contains a concern", async () => {
+      const response = await fetch(`${baseUrl}/api/triage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_input: "No",
+          language: "english",
+          conversation_history: [
+            { role: "user", content: "I have a headache" },
+            { role: "assistant", content: "How long have these symptoms been present?", is_question: true }
+          ]
+        })
+      });
+      assert.equal(response.status, 200);
+    });
   });
 
   describe("POST /api/ui/triage (Extended UI Endpoint)", () => {

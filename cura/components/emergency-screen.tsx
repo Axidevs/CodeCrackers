@@ -1,21 +1,10 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { AlertTriangle, ArrowLeft, Building2, Check, Copy, Phone, UsersRound } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Check, Copy } from 'lucide-react'
+import type { EmergencyAction } from '@/lib/cura-service'
 
 const focusRing = 'outline-none focus-visible:ring-2 focus-visible:ring-[#b3402a] focus-visible:ring-offset-2 focus-visible:ring-offset-[#fbfcf8]'
-
-const steps = [
-  { icon: Phone, title: 'Call your local emergency number', body: 'Tell them what you are feeling and where you are. Stay on the line and follow their instructions.' },
-  { icon: Building2, title: 'Or go to the nearest emergency department', body: 'If you can get there safely, go now. Do not drive yourself if you feel faint, confused or unwell.' },
-  { icon: UsersRound, title: 'Ask someone you trust to stay with you', body: 'Let a family member, friend or neighbour know what is happening so you are not alone.' },
-]
-
-const warningSigns = [
-  'Trouble breathing or chest pressure',
-  'Fainting, severe confusion, or sudden weakness',
-  'Heavy bleeding or severe, rapidly worsening pain',
-]
 
 const trustedMessage = 'I am not feeling well and may need urgent medical help. Can you come and stay with me, or call me as soon as you see this?'
 
@@ -54,14 +43,21 @@ function TrustedPersonMessage() {
   </section>
 }
 
-export function EmergencyScreen({ onReturn }: { onReturn: () => void }) {
+export function EmergencyScreen({ onReturn, emergencyAction, redFlags = [] }: { onReturn: () => void; emergencyAction: EmergencyAction | null; redFlags?: string[] }) {
+  const emergencySteps = emergencyAction?.steps || emergencyAction?.instructions || []
+  const primaryNumber = emergencyAction?.call || emergencyAction?.primary_number
+  const ambulanceNumber = emergencyAction?.ambulance || emergencyAction?.ambulance_number
+
   return <div className="mx-auto w-full max-w-[1080px] px-5 pb-16 pt-6 sm:px-10 sm:pt-10">
     <div className="flex flex-col gap-5 rounded-[28px] border border-[#ebd6cf] bg-[#fff8f5] p-6 sm:flex-row sm:items-start sm:gap-6 sm:p-8">
       <div className="grid size-14 shrink-0 place-items-center rounded-2xl bg-[#b3402a] text-white sm:size-16" aria-hidden="true"><AlertTriangle size={28} /></div>
       <div>
         <p className="text-xs font-bold uppercase tracking-[.16em] text-[#9a3a26]">Please act now</p>
         <h1 className="mt-2 font-display text-[clamp(2rem,5vw,3.25rem)] font-medium leading-[1.05] tracking-[-.04em] text-[#174a39] text-balance">You may need urgent help.</h1>
-        <p className="mt-4 max-w-[600px] text-base leading-7 text-[#4f5f57] sm:text-lg sm:leading-8 text-pretty">Please call your local emergency number or go to the nearest emergency department. If possible, ask someone you trust to stay with you.</p>
+        {emergencyAction?.guidance && <p className="mt-4 max-w-[600px] text-base leading-7 text-[#4f5f57] sm:text-lg sm:leading-8 text-pretty">{emergencyAction.guidance}</p>}
+        {redFlags.length > 0 && <p className="mt-3 max-w-[600px] text-sm leading-6 text-[#6f2b1d]">Red flags: {redFlags.join(', ')}</p>}
+        {primaryNumber && <p className="mt-3 text-sm font-semibold text-[#9a3a26]">Emergency number: {primaryNumber}</p>}
+        {ambulanceNumber && <p className="mt-1 text-sm font-semibold text-[#9a3a26]">Ambulance number: {ambulanceNumber}</p>}
       </div>
     </div>
 
@@ -69,26 +65,18 @@ export function EmergencyScreen({ onReturn }: { onReturn: () => void }) {
       <section aria-labelledby="next-steps-heading">
         <h2 id="next-steps-heading" className="font-display text-2xl font-medium tracking-[-.02em] text-[#174a39]">What to do next</h2>
         <ol className="mt-4 flex flex-col gap-3">
-          {steps.map(({ icon: Icon, title, body }, index) => <li key={title} className={`flex gap-4 rounded-3xl border p-5 ${index === 0 ? 'border-[#e3b9ac] bg-white shadow-[0_6px_20px_rgba(179,64,42,.08)]' : 'border-[#dfe5dd] bg-white'}`}>
+          {emergencySteps.map((body, index) => <li key={`${index}-${body}`} className={`flex gap-4 rounded-3xl border p-5 sm:p-6 ${index === 0 ? 'border-[#e3b9ac] bg-white shadow-[0_6px_20px_rgba(179,64,42,.08)]' : 'border-[#dfe5dd] bg-white'}`}>
             <div className="flex shrink-0 flex-col items-center gap-2">
-              <span className={`grid size-11 place-items-center rounded-2xl ${index === 0 ? 'bg-[#b3402a] text-white' : 'bg-[#edf3ed] text-[#174a39]'}`} aria-hidden="true"><Icon size={20} /></span>
+              <span className={`grid size-11 place-items-center rounded-2xl ${index === 0 ? 'bg-[#b3402a] text-white' : 'bg-[#edf3ed] text-[#174a39]'}`} aria-hidden="true"><span className="font-semibold">{index + 1}</span></span>
               <span className="text-xs font-bold text-[#7a8880]"><span className="sr-only">Step </span>{index + 1}</span>
             </div>
-            <div>
-              <h3 className="font-semibold leading-6 text-[#1e3b30]">{title}</h3>
-              <p className="mt-1 text-sm leading-6 text-[#5a6a62]">{body}</p>
-            </div>
+            <p className="text-sm leading-6 text-[#5a6a62]">{body}</p>
           </li>)}
         </ol>
       </section>
 
       <div className="flex flex-col gap-5">
-        <section aria-labelledby="warning-signs-heading" className="rounded-3xl border-l-4 border-[#b3402a] bg-[#fff4f0] p-5 sm:p-6">
-          <h2 id="warning-signs-heading" className="font-semibold text-[#6f2b1d]">Do not wait for a caregiver booking if you have:</h2>
-          <ul className="mt-3 flex flex-col gap-2.5">
-            {warningSigns.map(sign => <li key={sign} className="flex gap-3 text-sm leading-6 text-[#5e3a30]"><span className="mt-2 size-1.5 shrink-0 rounded-full bg-[#b3402a]" aria-hidden="true" />{sign}</li>)}
-          </ul>
-        </section>
+        {emergencyAction && <section aria-labelledby="emergency-guidance-heading" className="rounded-3xl border-l-4 border-[#b3402a] bg-[#fff4f0] p-5 sm:p-6"><h2 id="emergency-guidance-heading" className="font-semibold text-[#6f2b1d]">Emergency guidance</h2><p className="mt-3 text-sm leading-6 text-[#5e3a30]">This is a care-navigation response, not a diagnosis. CURA cannot contact emergency services for you.</p></section>}
         <TrustedPersonMessage />
       </div>
     </div>
