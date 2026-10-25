@@ -12,7 +12,7 @@ const { EMERGENCY_PROTOCOL } = require("../config/safetyRules");
  */
 async function handleOfficialTriage(req, res, next) {
   try {
-    const { decision } = await runPipeline(req.body, false);
+    const { decision } = await runPipeline(req.body);
 
     // Filter matched caregivers to official output shape
     const formattedCaregivers = (decision.matched_caregivers || []).map((cg) => ({
@@ -46,7 +46,7 @@ async function handleOfficialTriage(req, res, next) {
  */
 async function handleUiTriage(req, res, next) {
   try {
-    const { decision, trace } = await runPipeline(req.body, false);
+    const { decision, trace } = await runPipeline(req.body);
 
     return res.status(200).json({
       success: true,

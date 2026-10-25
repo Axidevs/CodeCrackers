@@ -4,6 +4,7 @@
 
 const caregiverDataService = require("../services/caregiverData.service");
 const bookingService = require("../services/booking.service");
+const env = require("../config/env");
 
 /**
  * GET /api/caregivers
@@ -106,10 +107,31 @@ function createBooking(req, res, next) {
       caregiver_name: caregiver_name || caregiver.name,
       slot_time: slot_time || [slot.date, slot.time].filter(Boolean).join(" "),
       patient_name,
-      notes
+      notes,
+      user_id: req.authUser?.user_id
     });
 
     return res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+function getMyBookings(req, res, next) {
+  try {
+    const bookings = bookingService.getBookingsForUser(req.authUser.user_id).map((booking) => {
+      const caregiver = caregiverDataService.getById(booking.caregiver_id);
+      return {
+        booking_id: booking.booking_id,
+        caregiver_id: booking.caregiver_id,
+        caregiver_name: booking.caregiver_name,
+        service: caregiver?.role || "Caregiver support",
+        slot_time: booking.slot_time,
+        status: booking.status,
+        booked_at: booking.booked_at
+      };
+    });
+    return res.status(200).json({ success: true, bookings });
   } catch (err) {
     next(err);
   }
@@ -120,6 +142,12 @@ function createBooking(req, res, next) {
  * Resets demo booking overlay (restores initial slot availability)
  */
 function resetDemoBookings(req, res, next) {
+  if (env.NODE_ENV !== "development") {
+    return res.status(404).json({
+      success: false,
+      error: { code: "ROUTE_NOT_FOUND", message: "This endpoint is unavailable." }
+    });
+  }
   try {
     const result = bookingService.resetStore();
     return res.status(200).json(result);
@@ -132,5 +160,6 @@ module.exports = {
   getCaregivers,
   getCaregiverById,
   createBooking,
+  getMyBookings,
   resetDemoBookings
 };

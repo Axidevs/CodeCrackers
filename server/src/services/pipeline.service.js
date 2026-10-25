@@ -13,6 +13,13 @@ const caregiverMatchingService = require("./caregiverMatching.service");
 const { hasHealthConcernInConversation } = require("../utils/healthInput");
 
 const INVALID_HEALTH_INPUT_MESSAGE = "Please describe a health concern or symptom so CURA can assist you. You can describe what you or someone else is experiencing in English, Hindi, or Hinglish.";
+const CARE_PATHWAY_LABELS = {
+  [CARE_TYPES.PARAMEDIC_HOME_VISIT]: "a paramedic home visit",
+  [CARE_TYPES.NURSE_VISIT]: "a nursing visit",
+  [CARE_TYPES.GP_TELECONSULT]: "a general physician teleconsultation",
+  [CARE_TYPES.SPECIALIST_CONSULT]: "a specialist consultation",
+  [CARE_TYPES.EMERGENCY_REFERRAL]: "emergency evaluation"
+};
 
 /**
  * Runs the end-to-end CURA navigation pipeline
@@ -22,10 +29,9 @@ const INVALID_HEALTH_INPUT_MESSAGE = "Please describe a health concern or sympto
  * @param {string} [request.language] - Language hint
  * @param {object} [request.location] - { lat, lng }
  * @param {Array<object>} [request.conversation_history] - Multi-turn messages
- * @param {boolean} [force_final=false] - If true, bypasses follow-up questions
  * @returns {Promise<object>} { decision, trace }
  */
-async function runPipeline(request, force_final = false) {
+async function runPipeline(request) {
   const startTime = Date.now();
   const requestId = `req_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
@@ -52,7 +58,12 @@ async function runPipeline(request, force_final = false) {
 
   // Step 3: Full Independent Deterministic Safety Gate Evaluation
   // Evaluates complete conversation context
-  const safetyResult = evaluateSafety(intake.full_text);
+  const safetyText = intake.affirmative_headache_warning
+    ? `${intake.full_text} sudden severe headache`
+    : intake.affirmative_breathing_or_chest_check
+      ? `${intake.full_text} severe shortness of breath`
+      : intake.full_text;
+  const safetyResult = evaluateSafety(safetyText);
 
   // BRANCH A: Emergency Red Flag Triggered
   if (safetyResult.is_emergency) {
@@ -81,7 +92,7 @@ async function runPipeline(request, force_final = false) {
   }
 
   // BRANCH B: Disambiguation Follow-Up Question
-  if (!force_final && intake.follow_up_question) {
+  if (intake.follow_up_question) {
     const latencyMs = Date.now() - startTime;
     const decision = {
       follow_up_question: intake.follow_up_question,
@@ -103,6 +114,27 @@ async function runPipeline(request, force_final = false) {
     };
 
     return { decision, trace };
+  }
+
+  if (!intake.is_ready_for_triage) {
+    const latencyMs = Date.now() - startTime;
+    return {
+      decision: {
+        follow_up_question: null,
+        care_type: CARE_TYPES.GP_TELECONSULT,
+        urgency: URGENCIES.SAME_DAY,
+        red_flags: [],
+        reasoning: "There is not enough information to safely determine an appropriate care pathway. No diagnosis has been made. Please seek evaluation from a qualified healthcare professional; if symptoms become severe or urgent, contact local emergency services.",
+        matched_caregivers: []
+      },
+      trace: {
+        request_id: requestId,
+        branch: "insufficient_information",
+        latency_ms: latencyMs,
+        language: intake.language,
+        source: "intake_safety_gate"
+      }
+    };
   }
 
   // BRANCH C: Final Care Triage & Caregiver Matching
@@ -127,7 +159,7 @@ async function runPipeline(request, force_final = false) {
     care_type: triageResult.care_type,
     urgency: triageResult.urgency,
     red_flags: [],
-    reasoning: triageResult.reasoning,
+    reasoning: `Based on the information provided, the suggested next step is ${CARE_PATHWAY_LABELS[triageResult.care_type] || "evaluation by a healthcare professional"}. This is care-navigation guidance, not a confirmed diagnosis; a qualified healthcare professional can assess the symptoms.`,
     matched_caregivers: matchedCaregivers
   };
 

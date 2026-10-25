@@ -3,8 +3,8 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Cura · The right care, at the right time',
-  description: 'A calm, human way to find your next step in care.',
+  title: 'CURA · Care, with clarity',
+  description: 'Compassionate care navigation and caregiver support, one step at a time.',
   generator: 'v0.app',
   icons: {
     icon: '/icon.svg',
@@ -12,11 +12,8 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  colorScheme: 'light dark',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: 'white' },
-    { media: '(prefers-color-scheme: dark)', color: 'black' },
-  ],
+  colorScheme: 'light',
+  themeColor: '#f6f8f5',
 }
 
 export default function RootLayout({

@@ -74,7 +74,7 @@ class BookingService {
    * Creates a demo booking
    * @param {object} bookingData
    */
-  createBooking({ caregiver_id, slot_id, caregiver_name, slot_time, patient_name, notes }) {
+  createBooking({ caregiver_id, slot_id, caregiver_name, slot_time, patient_name, notes, user_id }) {
     if (this.isSlotBooked(slot_id)) {
       const error = new Error(`Slot ${slot_id} is already booked or no longer available`);
       error.statusCode = 409;
@@ -93,13 +93,16 @@ class BookingService {
       status: "confirmed",
       booked_at: new Date().toISOString()
     };
+    if (user_id) newBooking.user_id = user_id;
 
     const nextBookings = [...this.bookings, newBooking];
     this.persistBookings(nextBookings);
+    const publicBooking = { ...newBooking };
+    delete publicBooking.user_id;
 
     return {
       success: true,
-      booking: newBooking,
+      booking: publicBooking,
       notice: "Demo booking confirmed (Prototype only - not a real clinical appointment)"
     };
   }
@@ -109,6 +112,12 @@ class BookingService {
    */
   getAllBookings() {
     return [...this.bookings];
+  }
+
+  getBookingsForUser(userId) {
+    return this.bookings
+      .filter((booking) => booking.user_id === userId)
+      .sort((first, second) => Date.parse(second.booked_at) - Date.parse(first.booked_at));
   }
 
   /**

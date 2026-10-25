@@ -94,3 +94,1771 @@ button { cursor: pointer; }
 .cura-living-footer button { text-decoration:underline; text-underline-offset:4px; }
 @media (max-width:700px) { .cura-living-hero { display:block; min-height:auto; padding-top:60px; }.cura-hero-copy h1 { font-size:clamp(4rem,18vw,6rem); }.cura-hero-illustration { min-height:280px; margin-top:28px; }.cura-path-nav { justify-content:flex-start; overflow-x:auto; }.cura-path-nav button { min-width:33vw; padding:0 14px; }.cura-living-section { grid-template-columns:42px 1fr; gap:20px; min-height:0; padding:72px 7vw; }.cura-living-section > :last-child { grid-column:2; }.cura-living-section h2 { font-size:clamp(3rem,14vw,4.5rem); }.cura-living-footer { display:block; line-height:2; } }
 @media (prefers-reduced-motion: reduce) { .cura-path-line,.cura-contour,.cura-waveform i { animation:none; stroke-dashoffset:0; } }
+
+:root {
+  color-scheme: light;
+  --cura-paper: #f6f8f5;
+  --cura-surface: #ffffff;
+  --cura-ink: #183c3b;
+  --cura-muted: #536a68;
+  --cura-teal: #17665f;
+  --cura-teal-dark: #104e49;
+  --cura-mint: #e5f1eb;
+  --cura-line: #dce7e1;
+  --cura-warm: #f2e7d8;
+  --cura-alert: #a94032;
+  --background: var(--cura-paper);
+  --foreground: var(--cura-ink);
+  --border: var(--cura-line);
+  --ring: #3e8d7a;
+  --muted-foreground: var(--cura-muted);
+  --cura-plum: var(--cura-ink);
+  --cura-coral: var(--cura-teal);
+  --cura-sage: var(--cura-mint);
+  --cura-gold: #d8a858;
+  --cura-ink-soft: var(--cura-muted);
+}
+
+html {
+  background: var(--cura-paper);
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--cura-paper);
+  color: var(--cura-ink);
+  font-family: 'DM Sans', 'Segoe UI', Arial, sans-serif;
+}
+
+button,
+a,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #287c70;
+  outline-offset: 3px;
+}
+
+.cura-living {
+  --ink: var(--cura-ink);
+  --coral: var(--cura-teal);
+  --paper: var(--cura-paper);
+  background: var(--cura-paper);
+  color: var(--cura-ink);
+}
+
+.cura-living-header {
+  position: relative;
+  z-index: 2;
+  max-width: 1320px;
+  padding: 17px clamp(22px, 6vw, 88px);
+  border-bottom-color: var(--cura-line);
+}
+
+.cura-home-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--cura-ink);
+  text-decoration: none;
+}
+
+.cura-brand-mark {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--cura-teal-dark);
+  color: white;
+}
+
+.cura-brand-name {
+  color: var(--cura-ink);
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -.06em;
+}
+
+.cura-brand-tagline {
+  margin-left: 2px;
+  padding-left: 12px;
+  border-left: 1px solid var(--cura-line);
+  color: var(--cura-muted);
+  font-size: 12px;
+}
+
+.cura-home-links {
+  display: flex;
+  align-items: center;
+  gap: clamp(18px, 3vw, 38px);
+}
+
+.cura-home-links a {
+  color: var(--cura-muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color .2s ease;
+}
+
+.cura-home-links a:hover {
+  color: var(--cura-teal);
+}
+
+.cura-urgent {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 15px;
+  border: 1px solid #e7c9be;
+  border-radius: 999px;
+  background: #fffaf7;
+  color: #843c32;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.cura-urgent:hover {
+  background: #f9ece6;
+}
+
+.cura-living-hero {
+  max-width: 1320px;
+  min-height: 620px;
+  grid-template-columns: minmax(0, 1.02fr) minmax(360px, .88fr);
+  gap: clamp(30px, 6vw, 96px);
+  padding: clamp(68px, 8vw, 112px) clamp(22px, 6vw, 88px) 76px;
+}
+
+.cura-kicker {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--cura-teal);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.cura-kicker-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c47d4a;
+  box-shadow: 0 0 0 4px #f2e7d8;
+}
+
+.cura-hero-copy h1 {
+  max-width: 720px;
+  margin: 25px 0 24px;
+  color: var(--cura-ink);
+  font-size: clamp(3.8rem, 5.2vw, 5.2rem);
+  font-weight: 500;
+  line-height: .94;
+  letter-spacing: -.075em;
+  text-wrap: balance;
+}
+
+.cura-hero-copy h1 em {
+  margin-left: clamp(0px, 3vw, 42px);
+  color: var(--cura-teal);
+  font-style: normal;
+}
+
+.cura-hero-intro {
+  max-width: 470px;
+  margin-bottom: 29px;
+  color: var(--cura-muted);
+  font-size: 17px;
+  line-height: 1.75;
+  text-wrap: pretty;
+}
+
+.cura-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 15px 22px;
+}
+
+.cura-primary-cta,
+.cura-outline-cta {
+  min-height: 54px;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 21px;
+  border: 1px solid var(--cura-teal);
+  border-radius: 14px;
+  background: var(--cura-teal);
+  box-shadow: 0 8px 18px rgb(23 102 95 / 14%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+.cura-primary-cta:hover,
+.cura-outline-cta:hover {
+  transform: translateY(-2px);
+  background: var(--cura-teal-dark);
+  box-shadow: 0 12px 24px rgb(23 102 95 / 19%);
+}
+
+.cura-text-cta {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 8px;
+  color: var(--cura-ink);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-decoration-color: #bc8064;
+  text-transform: none;
+  transition: color .2s ease;
+}
+
+.cura-text-cta:hover {
+  color: var(--cura-teal);
+}
+
+.cura-trust-note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 26px;
+  color: var(--cura-muted);
+  font-size: 12px;
+}
+
+.cura-trust-note svg {
+  color: var(--cura-teal);
+}
+
+.cura-hero-illustration {
+  min-height: 430px;
+  overflow: hidden;
+  border: 1px solid #e3e9e2;
+  border-radius: 42% 42% 24px 24px;
+  background:
+    radial-gradient(ellipse at 50% 35%, #fff 0, #f5f8f2 52%, #e8f0e9 100%);
+}
+
+.cura-hero-illustration::before {
+  position: absolute;
+  top: 12%;
+  left: 13%;
+  width: 74%;
+  height: 74%;
+  border: 1px solid rgb(29 93 81 / 10%);
+  border-radius: 50%;
+  content: '';
+}
+
+.cura-hero-illustration svg {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 21px;
+}
+
+.cura-illustration-note {
+  position: absolute;
+  z-index: 2;
+  top: 8%;
+  left: 6%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 13px;
+  border: 1px solid rgb(220 231 225 / 85%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 8px 24px rgb(24 60 59 / 8%);
+  color: var(--cura-muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.cura-illustration-note svg {
+  width: 16px;
+  margin: 0;
+  color: var(--cura-teal);
+}
+
+.cura-illustration-orbit {
+  stroke: #cadbd2;
+  stroke-width: 1.5;
+  stroke-dasharray: 2 8;
+}
+
+.cura-illustration-path {
+  stroke: #83b7a1;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 4 9;
+}
+
+.cura-illustration-node {
+  fill: #fff;
+  stroke: #448778;
+  stroke-width: 4;
+}
+
+.cura-person-shadow {
+  fill: #dcebe3;
+}
+
+.cura-person-body {
+  fill: #e0b894;
+}
+
+.cura-person-head {
+  fill: #d99e77;
+}
+
+.cura-person-hair {
+  fill: #314a46;
+}
+
+.cura-caregiver-body {
+  fill: #2f8375;
+}
+
+.cura-caregiver-head {
+  fill: #b97855;
+}
+
+.cura-caregiver-hair {
+  fill: #283c3b;
+}
+
+.cura-caregiver-coat {
+  fill: none;
+  stroke: #f7fbf8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 7;
+}
+
+.cura-heart-mark {
+  fill: #f5e2d4;
+  stroke: #c88562;
+  stroke-width: 2;
+}
+
+.cura-heart-line {
+  stroke: #a64d42;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.cura-figure-label {
+  right: 7%;
+  bottom: 7%;
+  color: var(--cura-muted);
+  font-size: 10px;
+  letter-spacing: .12em;
+}
+
+.cura-path-nav {
+  position: relative;
+  top: auto;
+  z-index: 1;
+  justify-content: center;
+  border-block: 1px solid #254c49;
+  background: var(--cura-ink);
+}
+
+.cura-path-nav button {
+  min-height: 62px;
+  justify-content: center;
+  border-right-color: rgb(255 255 255 / 12%);
+  color: #e4efea;
+  letter-spacing: .07em;
+  text-transform: none;
+}
+
+.cura-path-nav button span {
+  color: #a7d0be;
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 17px;
+}
+
+.cura-path-nav button.is-active,
+.cura-path-nav button:hover,
+.cura-path-nav button:focus-visible {
+  background: #245451;
+  color: #fff;
+}
+
+.cura-living-section {
+  max-width: 1320px;
+  min-height: 430px;
+  grid-template-columns: 72px minmax(0, 1fr) minmax(220px, .7fr);
+  gap: clamp(24px, 5vw, 74px);
+  padding: clamp(70px, 8vw, 106px) clamp(22px, 8vw, 112px);
+}
+
+.cura-section-number {
+  color: var(--cura-teal);
+  font-size: 44px;
+}
+
+.cura-living-section h2 {
+  max-width: 580px;
+  margin: 17px 0;
+  font-size: clamp(2.75rem, 5vw, 4.7rem);
+  line-height: .98;
+  letter-spacing: -.06em;
+  text-wrap: balance;
+}
+
+.cura-living-section p:not(.cura-kicker) {
+  max-width: 480px;
+  color: var(--cura-muted);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.cura-listen {
+  background: #e7f0e9;
+}
+
+.cura-understand {
+  background: var(--cura-ink);
+  color: white;
+}
+
+.cura-understand .cura-section-number,
+.cura-understand .cura-kicker {
+  color: #a8d5c2;
+}
+
+.cura-understand p:not(.cura-kicker) {
+  color: #d3e1dc;
+}
+
+.cura-question-stack {
+  align-self: center;
+  padding: 19px 22px;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 20px;
+  background: rgb(255 255 255 / 5%);
+}
+
+.cura-question-stack span {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-color: rgb(255 255 255 / 16%);
+  color: #f2f7f4;
+  font-family: 'DM Sans', 'Segoe UI', Arial, sans-serif;
+  font-size: 14px;
+}
+
+.cura-question-stack span::before {
+  content: none;
+}
+
+.cura-question-stack svg {
+  flex: 0 0 auto;
+  color: #a8d5c2;
+}
+
+.cura-connect {
+  background: #f4eee5;
+  color: var(--cura-ink);
+}
+
+.cura-connect .cura-section-number,
+.cura-connect .cura-kicker {
+  color: var(--cura-teal);
+}
+
+.cura-connect p:not(.cura-kicker) {
+  color: var(--cura-muted);
+}
+
+.cura-connect .cura-primary-cta {
+  background: var(--cura-teal);
+  color: white;
+}
+
+.cura-connect .cura-primary-cta:hover {
+  background: var(--cura-teal-dark);
+}
+
+.cura-section-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--cura-teal);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cura-art-circle {
+  display: grid;
+  width: 110px;
+  height: 110px;
+  place-items: center;
+  border: 1px solid #c8ddd0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 12px 35px rgb(24 60 59 / 8%);
+}
+
+.cura-living-section .cura-outline-cta {
+  margin-top: 13px;
+}
+
+.cura-connect-mark {
+  gap: 12px;
+  color: var(--cura-teal);
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 20px;
+}
+
+.cura-connect-mark svg {
+  stroke: var(--cura-teal);
+}
+
+.cura-safety-note {
+  display: flex;
+  max-width: 1180px;
+  align-items: center;
+  gap: 15px;
+  margin: 0 auto;
+  padding: 24px clamp(22px, 5vw, 60px);
+  border: 1px solid var(--cura-line);
+  border-radius: 18px;
+  background: white;
+  box-shadow: 0 10px 28px rgb(24 60 59 / 5%);
+}
+
+.cura-safety-note > svg {
+  flex: 0 0 auto;
+  color: var(--cura-teal);
+}
+
+.cura-safety-note p {
+  flex: 1;
+  margin: 0;
+  color: var(--cura-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.cura-safety-note button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  color: var(--cura-teal-dark);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cura-living-footer {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 24px;
+  margin-top: 76px;
+  padding: 27px clamp(22px, 8vw, 112px);
+  background: var(--cura-ink);
+  color: #e6f0eb;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.cura-living-footer button {
+  color: #b4d8c9;
+  font-weight: 700;
+}
+
+.cura-footer-brand {
+  color: white;
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 19px;
+  text-decoration: none;
+}
+
+.cura-footer-brand span {
+  margin-left: 8px;
+  color: #b4c9c0;
+  font-family: 'DM Sans', 'Segoe UI', Arial, sans-serif;
+  font-size: 11px;
+}
+
+.cura-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cura-app-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px clamp(20px, 5vw, 68px);
+  border-bottom: 1px solid var(--cura-line);
+  background: rgb(255 255 255 / 94%);
+}
+
+.cura-app-header .cura-brand-name {
+  font-size: 24px;
+}
+
+.cura-header-reset,
+.cura-emergency-button,
+.cura-icon-button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 650;
+  transition: background .18s ease, color .18s ease, transform .18s ease;
+}
+
+.cura-header-reset {
+  padding: 0 13px;
+  color: var(--cura-muted);
+}
+
+.cura-header-reset:hover {
+  background: #edf3ef;
+  color: var(--cura-ink);
+}
+
+.cura-emergency-button {
+  padding: 0 15px;
+  border: 1px solid #e7c9be;
+  background: #fffaf7;
+  color: #843c32;
+}
+
+.cura-emergency-button:hover {
+  background: #f9ece6;
+}
+
+.cura-icon-button {
+  width: 44px;
+  border: 1px solid var(--cura-line);
+  background: white;
+  color: var(--cura-ink);
+}
+
+.cura-icon-button:hover {
+  background: var(--cura-mint);
+}
+
+body:has(.cura-app-header) {
+  background: var(--cura-paper);
+}
+
+body:has(.cura-app-header) main:not(.cura-living) {
+  background: var(--cura-paper);
+}
+
+body:has(.cura-app-header) main:not(.cura-living) > div > div {
+  animation: cura-content-enter .32s ease-out both;
+}
+
+@keyframes cura-content-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+body:has(.cura-app-header) main:not(.cura-living) h1:not(.text-white),
+body:has(.cura-app-header) main:not(.cura-living) h2:not(.text-white) {
+  text-wrap: balance;
+}
+
+body:has(.cura-app-header) main:not(.cura-living) p {
+  line-height: 1.7;
+}
+
+body:has(.cura-app-header) main:not(.cura-living) textarea {
+  min-height: 120px;
+  border-color: var(--cura-line);
+  border-radius: 18px;
+  background: white;
+  color: var(--cura-ink);
+  box-shadow: 0 8px 24px rgb(24 60 59 / 4%);
+  line-height: 1.7;
+}
+
+body:has(.cura-app-header) main:not(.cura-living) textarea::placeholder {
+  color: #788d87;
+}
+
+body:has(.cura-app-header) main:not(.cura-living) button:not(.cura-header-reset, .cura-emergency-button, .cura-icon-button) {
+  min-height: 44px;
+  transition: transform .18s ease, background-color .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+body:has(.cura-app-header) main:not(.cura-living) button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+body:has(.cura-app-header) main:not(.cura-living) button:disabled {
+  cursor: not-allowed;
+}
+
+.cura-flow-layout {
+  width: 100%;
+}
+
+.cura-conversation {
+  display: flex;
+  width: min(100% - 40px, 760px);
+  flex-direction: column;
+  gap: 10px;
+  margin: 26px auto 0;
+  padding: 18px;
+  border: 1px solid var(--cura-line);
+  border-radius: 20px;
+  background: #eef4ef;
+}
+
+.cura-message {
+  width: fit-content;
+  max-width: min(86%, 540px);
+  padding: 12px 15px;
+  border: 1px solid var(--cura-line);
+  border-radius: 15px 15px 15px 5px;
+  background: white;
+  box-shadow: 0 4px 12px rgb(24 60 59 / 4%);
+}
+
+.cura-message-user {
+  align-self: flex-end;
+  border-color: #c9e1d5;
+  border-radius: 15px 15px 5px 15px;
+  background: #e1f0e8;
+}
+
+.cura-message-label {
+  color: var(--cura-teal-dark);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.cura-message p {
+  margin: 4px 0 0;
+  color: var(--cura-ink);
+  font-size: 13px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.cura-question-content {
+  padding-bottom: 50px;
+}
+
+.cura-question-heading {
+  padding: 4px 2px 23px;
+}
+
+.cura-step-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--cura-teal);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.cura-step-label > span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c47d4a;
+  box-shadow: 0 0 0 4px #f2e7d8;
+}
+
+.cura-question-card {
+  padding: clamp(18px, 4vw, 28px);
+  border: 1px solid var(--cura-line);
+  border-radius: 23px;
+  background: white;
+  box-shadow: 0 18px 48px rgb(24 60 59 / 7%);
+}
+
+.cura-language-option {
+  min-height: 39px !important;
+  padding: 0 14px;
+  border: 1px solid var(--cura-line);
+  border-radius: 999px;
+  background: white;
+  color: var(--cura-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.cura-language-option.is-selected {
+  border-color: var(--cura-teal);
+  background: var(--cura-ink);
+  color: white;
+}
+
+.cura-answer-composer {
+  position: relative;
+  margin-top: 17px;
+}
+
+.cura-answer-composer textarea {
+  min-height: 152px !important;
+  padding: 17px 62px 17px 17px;
+}
+
+.cura-mic-button {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: grid;
+  width: 42px;
+  min-height: 42px !important;
+  place-items: center;
+  border: 1px solid #cfe1d7;
+  border-radius: 13px;
+  background: #e8f2ec;
+  color: var(--cura-teal-dark);
+}
+
+.cura-mic-button:hover,
+.cura-mic-button.is-listening {
+  background: var(--cura-teal);
+  color: white;
+}
+
+.cura-status-message,
+.cura-error-message {
+  margin-top: 12px;
+  font-size: 13px;
+}
+
+.cura-status-message {
+  color: var(--cura-teal-dark);
+}
+
+.cura-error-message {
+  color: var(--cura-alert);
+}
+
+.cura-composer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #eaf0ec;
+}
+
+.cura-composer-actions > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--cura-muted);
+  font-size: 11px;
+}
+
+.cura-composer-actions > span svg {
+  color: var(--cura-teal);
+}
+
+body:has(.cura-app-header) main:not(.cura-living) button.cura-primary-cta {
+  min-height: 48px;
+  padding-inline: 20px;
+  border-radius: 13px;
+  background: var(--cura-teal);
+  box-shadow: 0 7px 18px rgb(23 102 95 / 14%);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+body:has(.cura-app-header) main:not(.cura-living) button.cura-primary-cta:hover {
+  background: var(--cura-teal-dark);
+}
+
+@media (max-width: 900px) {
+  .cura-living-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 34px;
+    min-height: auto;
+  }
+
+  .cura-hero-copy {
+    max-width: 700px;
+  }
+
+  .cura-hero-copy h1 {
+    font-size: clamp(4rem, 8vw, 6.1rem);
+  }
+
+  .cura-hero-illustration {
+    width: min(100%, 560px);
+    min-height: 0;
+    margin: 0 auto;
+  }
+
+  .cura-hero-illustration svg {
+    margin-top: 22px;
+  }
+}
+
+@media (max-width: 760px) {
+  .cura-living-header {
+    gap: 12px;
+  }
+
+  .cura-home-links {
+    display: none;
+  }
+
+  .cura-living-hero {
+    display: grid;
+    min-height: auto;
+    grid-template-columns: minmax(0, 1fr);
+    padding-top: 65px;
+  }
+
+  .cura-hero-copy h1 {
+    font-size: clamp(3.7rem, 13vw, 6rem);
+  }
+
+  .cura-hero-copy h1 em {
+    margin-left: 4vw;
+  }
+
+  .cura-hero-illustration {
+    width: min(100%, 540px);
+    min-height: 0;
+    margin: 10px auto 0;
+  }
+
+  .cura-hero-illustration svg {
+    margin-top: 35px;
+  }
+
+  .cura-living-section {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 16px;
+    min-height: 0;
+    padding-block: 68px;
+  }
+
+  .cura-section-number {
+    font-size: 34px;
+  }
+
+  .cura-living-section h2 {
+    font-size: clamp(2.5rem, 9vw, 4rem);
+  }
+
+  .cura-living-section > :last-child {
+    grid-column: 2;
+  }
+
+  .cura-safety-note {
+    flex-wrap: wrap;
+    margin-inline: 20px;
+    padding: 19px;
+  }
+
+  .cura-safety-note p {
+    flex-basis: calc(100% - 44px);
+  }
+
+  .cura-safety-note button {
+    margin-left: 36px;
+  }
+
+  .cura-conversation {
+    margin-top: 18px;
+    padding: 13px;
+  }
+
+  .cura-message {
+    max-width: 93%;
+  }
+
+  .cura-composer-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cura-composer-actions .cura-primary-cta {
+    width: 100%;
+  }
+
+  .cura-living-footer {
+    margin-top: 50px;
+  }
+}
+
+@media (max-width: 480px) {
+  .cura-living-header {
+    padding-inline: 18px;
+  }
+
+  .cura-brand-tagline {
+    display: none;
+  }
+
+  .cura-urgent {
+    min-height: 40px;
+    padding-inline: 11px;
+    font-size: 11px;
+  }
+
+  .cura-living-hero {
+    padding: 54px 20px 54px;
+  }
+
+  .cura-hero-copy h1 {
+    font-size: clamp(3.25rem, 15vw, 4.6rem);
+  }
+
+  .cura-hero-intro {
+    font-size: 15px;
+  }
+
+  .cura-hero-actions {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .cura-primary-cta {
+    width: 100%;
+  }
+
+  .cura-path-nav {
+    justify-content: stretch;
+  }
+
+  .cura-path-nav button {
+    min-width: 0;
+    flex: 1;
+    gap: 6px;
+    padding-inline: 9px;
+    font-size: 11px;
+  }
+
+  .cura-path-nav button svg {
+    display: none;
+  }
+
+  .cura-living-section {
+    padding-inline: 20px;
+  }
+
+  .cura-living-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cura-app-header {
+    min-height: 68px;
+    padding-inline: 15px;
+  }
+
+  .cura-app-header .cura-brand-mark {
+    width: 36px;
+    height: 36px;
+  }
+
+  .cura-app-header .cura-brand-name {
+    font-size: 21px;
+  }
+
+  .cura-header-reset {
+    width: 42px;
+    padding: 0;
+    overflow: hidden;
+    font-size: 0;
+  }
+
+  .cura-header-reset svg {
+    flex: 0 0 auto;
+  }
+
+  .cura-emergency-button {
+    min-height: 42px;
+    gap: 6px;
+    padding-inline: 10px;
+    font-size: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  body:has(.cura-app-header) main:not(.cura-living) > div > div {
+    animation: none;
+  }
+}
+
+.cura-living [id] {
+  scroll-margin-top: 24px;
+}
+
+.cura-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cura-login-link,
+.cura-account-button {
+  min-height: 42px;
+  padding: 0 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background-color .18s ease, color .18s ease, border-color .18s ease;
+}
+
+.cura-login-link {
+  color: var(--cura-teal-dark);
+}
+
+.cura-login-link:hover {
+  background: #e8f1eb;
+}
+
+.cura-account-button {
+  border: 1px solid #bfd5c8;
+  background: #fff;
+  color: var(--cura-teal-dark);
+}
+
+.cura-account-button:hover {
+  border-color: var(--cura-teal);
+  background: #eff6f0;
+}
+
+.cura-living a:focus-visible,
+.cura-living button:focus-visible {
+  outline: 3px solid #c47d4a;
+  outline-offset: 3px;
+}
+
+.cura-path-nav a {
+  display: flex;
+  min-height: 62px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 25px;
+  border-right: 1px solid rgb(255 255 255 / 12%);
+  color: #e4efea;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-decoration: none;
+  transition: background-color .18s ease, color .18s ease;
+}
+
+.cura-path-nav a span {
+  color: #a7d0be;
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 17px;
+}
+
+.cura-path-nav a.is-active,
+.cura-path-nav a:hover {
+  background: #245451;
+  color: #fff;
+}
+
+.cura-section-link,
+.cura-about-aside a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  color: var(--cura-teal-dark);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.cura-section-link:hover,
+.cura-about-aside a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.cura-question-stack b {
+  color: #a7d0be;
+  font-size: 11px;
+  letter-spacing: .08em;
+}
+
+.cura-about-section,
+.cura-help-section {
+  display: grid;
+  max-width: 1320px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(250px, .8fr);
+  gap: clamp(28px, 7vw, 90px);
+  margin: 0 auto;
+  padding: clamp(64px, 8vw, 100px) clamp(22px, 8vw, 112px);
+}
+
+.cura-about-copy h2,
+.cura-help-section h2 {
+  max-width: 640px;
+  margin: 16px 0 20px;
+  color: var(--cura-ink);
+  font-size: clamp(2.4rem, 5vw, 4rem);
+  line-height: .98;
+}
+
+.cura-about-copy > p:not(.cura-kicker),
+.cura-about-aside p,
+.cura-help-list p {
+  color: var(--cura-muted);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.cura-about-aside {
+  align-self: center;
+  padding: 27px;
+  border: 1px solid var(--cura-line);
+  border-radius: 22px;
+  background: white;
+  box-shadow: 0 12px 30px rgb(24 60 59 / 5%);
+}
+
+.cura-about-aside > svg {
+  color: var(--cura-teal);
+}
+
+.cura-about-aside h3,
+.cura-help-list h3 {
+  margin: 13px 0 8px;
+  color: var(--cura-ink);
+  font-size: 17px;
+  font-weight: 750;
+}
+
+.cura-help-section {
+  max-width: none;
+  grid-template-columns: minmax(220px, .65fr) minmax(0, 1.35fr);
+  border-top: 1px solid var(--cura-line);
+  background: #f0f5f0;
+}
+
+.cura-help-section > div {
+  width: 100%;
+  max-width: 1180px;
+}
+
+.cura-help-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.cura-help-list article {
+  padding: 20px;
+  border: 1px solid #dce7de;
+  border-radius: 18px;
+  background: white;
+}
+
+.cura-help-list h3 {
+  margin-top: 0;
+  font-size: 15px;
+}
+
+.cura-help-list p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.cura-help-list button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  color: var(--cura-teal-dark);
+  font-size: 12px;
+  font-weight: 750;
+  text-align: left;
+}
+
+.cura-living-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-left: auto;
+}
+
+.cura-living-footer nav a,
+.cura-living-footer nav button {
+  color: #d6e6de;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.cura-living-footer nav a:hover,
+.cura-living-footer nav button:hover {
+  color: white;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.cura-dialog-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(15 39 36 / 58%);
+}
+
+.cura-auth-dialog {
+  position: relative;
+  width: min(100%, 460px);
+  padding: clamp(25px, 6vw, 40px);
+  border: 1px solid #dce7de;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 24px 80px rgb(9 32 28 / 24%);
+}
+
+.cura-dialog-close {
+  position: absolute;
+  top: 13px;
+  right: 15px;
+  display: grid;
+  width: 42px;
+  min-height: 42px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--cura-muted);
+  font-size: 26px;
+}
+
+.cura-dialog-close:hover {
+  background: #eff5f0;
+}
+
+.cura-dialog-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  margin-bottom: 22px;
+  border-radius: 15px;
+  background: #e9f3eb;
+  color: var(--cura-teal);
+}
+
+.cura-auth-dialog h2 {
+  margin: 10px 0;
+  color: var(--cura-ink);
+  font-size: clamp(2rem, 7vw, 2.7rem);
+  line-height: 1;
+}
+
+.cura-auth-dialog > p:not(.cura-kicker) {
+  margin: 14px 0;
+  color: var(--cura-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.cura-auth-notice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 19px 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f0f5f0;
+  color: var(--cura-teal-dark);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.cura-auth-dialog > .cura-primary-cta {
+  width: 100%;
+  justify-content: center;
+}
+
+.cura-auth-switch {
+  display: block;
+  min-height: 44px;
+  margin: 12px auto 0;
+  color: var(--cura-muted);
+  font-size: 12px;
+}
+
+.cura-auth-switch b {
+  color: var(--cura-teal-dark);
+}
+
+@media (max-width: 760px) {
+  .cura-header-actions {
+    gap: 3px;
+  }
+
+  .cura-about-section,
+  .cura-help-section {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  .cura-help-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cura-living-footer nav {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .cura-living-header {
+    gap: 5px;
+    padding-inline: 12px;
+  }
+
+  .cura-header-actions {
+    gap: 1px;
+  }
+
+  .cura-login-link,
+  .cura-account-button {
+    min-height: 40px;
+    padding-inline: 8px;
+    font-size: 11px;
+  }
+
+  .cura-living-header .cura-urgent {
+    width: 40px;
+    min-height: 40px;
+    justify-content: center;
+    padding: 0;
+    overflow: hidden;
+    font-size: 0;
+  }
+
+  .cura-living-header .cura-urgent svg {
+    flex: 0 0 auto;
+  }
+
+  .cura-path-nav a {
+    min-width: 0;
+    flex: 1;
+    justify-content: center;
+    gap: 6px;
+    padding-inline: 7px;
+    font-size: 10px;
+  }
+
+  .cura-path-nav a svg {
+    display: none;
+  }
+
+  .cura-living-footer nav {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cura-path-nav a,
+  .cura-login-link,
+  .cura-account-button {
+    transition: none;
+  }
+}
+
+.cura-history-link,
+.cura-signout-button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid #d3e1d8;
+  border-radius: 999px;
+  background: white;
+  color: var(--cura-teal-dark);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cura-history-link:hover,
+.cura-signout-button:hover {
+  background: #eff6f0;
+}
+
+.cura-auth-checking {
+  color: var(--cura-muted);
+  font-size: 11px;
+}
+
+.cura-auth-page-status {
+  max-width: 1200px;
+  margin: 8px auto 0;
+  padding: 0 20px;
+  color: #8b513a;
+  font-size: 12px;
+}
+
+.cura-auth-dialog form {
+  display: grid;
+  gap: 11px;
+  margin-top: 22px;
+}
+
+.cura-auth-dialog input {
+  width: 100%;
+  min-height: 50px;
+  padding: 0 14px;
+  border: 1px solid var(--cura-line);
+  border-radius: 13px;
+  background: #fff;
+  color: var(--cura-ink);
+  font: inherit;
+  font-size: 15px;
+}
+
+.cura-auth-dialog input:focus-visible {
+  border-color: var(--cura-teal);
+  outline: 3px solid #dcece1;
+  outline-offset: 1px;
+}
+
+.cura-auth-label {
+  margin-top: 3px;
+  color: var(--cura-ink);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.cura-auth-dialog form > .cura-primary-cta {
+  width: 100%;
+  justify-content: center;
+  margin-top: 7px;
+}
+
+.cura-auth-dialog .cura-primary-cta:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.cura-auth-status {
+  margin: 14px 0;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: #f0f5f0;
+  color: var(--cura-teal-dark);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.cura-auth-error {
+  margin: 14px 0 0;
+  color: #9a4d39;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.cura-dev-otp {
+  display: grid;
+  gap: 5px;
+  padding: 13px;
+  border: 1px solid #e5d4b7;
+  border-radius: 13px;
+  background: #fff9ed;
+  color: #694c22;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.cura-dev-otp b {
+  font-size: 18px;
+  letter-spacing: .15em;
+}
+
+.cura-account-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.cura-account-actions .cura-primary-cta {
+  width: 100%;
+  justify-content: center;
+}
+
+.cura-signout-button {
+  min-height: 46px;
+  border-radius: 13px;
+}
+
+.cura-history-page {
+  width: min(100% - 40px, 850px);
+  margin: 0 auto;
+  padding: clamp(38px, 7vw, 75px) 0;
+}
+
+.cura-history-page > h1 {
+  margin: 10px 0 28px;
+  color: var(--cura-ink);
+  font-size: clamp(2.5rem, 7vw, 4rem);
+  line-height: 1;
+}
+
+.cura-history-empty {
+  display: grid;
+  justify-items: start;
+  gap: 11px;
+  padding: clamp(22px, 5vw, 36px);
+  border: 1px solid var(--cura-line);
+  border-radius: 22px;
+  background: white;
+  box-shadow: 0 12px 32px rgb(24 60 59 / 5%);
+}
+
+.cura-history-empty > svg {
+  color: var(--cura-teal);
+}
+
+.cura-history-empty h2 {
+  margin: 4px 0 0;
+  color: var(--cura-ink);
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 25px;
+}
+
+.cura-history-empty p,
+.cura-history-message {
+  color: var(--cura-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.cura-history-empty .cura-primary-cta,
+.cura-history-empty .cura-outline-cta {
+  margin-top: 8px;
+}
+
+.cura-booking-list {
+  display: grid;
+  gap: 13px;
+}
+
+.cura-booking-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 23px;
+  border: 1px solid var(--cura-line);
+  border-radius: 19px;
+  background: white;
+  box-shadow: 0 8px 24px rgb(24 60 59 / 4%);
+}
+
+.cura-booking-card h2 {
+  margin: 7px 0;
+  color: var(--cura-ink);
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 23px;
+}
+
+.cura-booking-card > div > p:not(.cura-kicker) {
+  margin: 0 0 10px;
+  color: var(--cura-muted);
+  font-size: 13px;
+}
+
+.cura-booking-card > div > p.cura-history-appointment {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.cura-booking-card > div > span {
+  color: #7b8b82;
+  font-size: 11px;
+}
+
+.cura-booking-status {
+  flex: 0 0 auto;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: #e9f3eb;
+  color: var(--cura-teal-dark);
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: capitalize;
+}
+
+@media (max-width: 480px) {
+  .cura-history-link {
+    width: 38px;
+    padding: 0;
+    overflow: hidden;
+    font-size: 0;
+  }
+
+  .cura-history-link svg {
+    flex: 0 0 auto;
+  }
+
+  .cura-booking-card {
+    align-items: flex-start;
+    padding: 18px;
+  }
+
+  .cura-booking-card h2 {
+    font-size: 20px;
+  }
+}

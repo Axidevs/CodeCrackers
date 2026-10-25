@@ -6,6 +6,15 @@
 
 const RED_FLAGS = [
   {
+    id: "sudden_severe_headache",
+    name: "Sudden Severe Headache",
+    patterns: [
+      /\b(?:sudden(?:ly)?\s+(?:severe|worst)|worst\s+headache\s+(?:of\s+my\s+life|ever))\b/i,
+      /\b(?:headache|head\s+pain)\b.{0,35}\b(?:sudden(?:ly)?\s+(?:severe|worst)|worst\s+ever)\b/i
+    ],
+    reason: "Sudden, severe headache reported"
+  },
+  {
     id: "chest_pain",
     name: "Chest Pain / Cardiac Symptoms",
     patterns: [

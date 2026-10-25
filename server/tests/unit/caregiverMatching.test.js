@@ -1,13 +1,35 @@
-const { test, describe, beforeEach } = require("node:test");
+const { test, describe, beforeEach, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const { matchCaregivers } = require("../../src/services/caregiverMatching.service");
 const bookingService = require("../../src/services/booking.service");
 const caregiverDataService = require("../../src/services/caregiverData.service");
 const matchingConfig = require("../../src/config/matchingWeights");
 
+let temporaryBookingStore;
+let originalBookingStore;
+
 describe("Caregiver Matching Engine Tests", () => {
   beforeEach(() => {
+    temporaryBookingStore = fs.mkdtempSync(path.join(os.tmpdir(), "cura-matching-suite-"));
+    originalBookingStore = {
+      path: bookingService.overlayPath,
+      bookings: bookingService.bookings,
+      bookedSlots: bookingService.bookedSlots
+    };
+    bookingService.overlayPath = path.join(temporaryBookingStore, "bookings.json");
+    bookingService.bookings = [];
+    bookingService.bookedSlots = new Set();
     bookingService.resetStore();
+  });
+
+  afterEach(() => {
+    bookingService.overlayPath = originalBookingStore.path;
+    bookingService.bookings = originalBookingStore.bookings;
+    bookingService.bookedSlots = originalBookingStore.bookedSlots;
+    fs.rmSync(temporaryBookingStore, { recursive: true, force: true });
   });
 
   test("matches paramedic for paramedic_home_visit", () => {

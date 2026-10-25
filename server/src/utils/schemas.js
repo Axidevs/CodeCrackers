@@ -46,6 +46,15 @@ const BookingRequestSchema = z.object({
   notes: z.string().optional().default("Demo booking via CURA")
 });
 
+const OtpRequestSchema = z.object({
+  phone: z.string().trim().min(8).max(32)
+});
+
+const OtpVerifySchema = z.object({
+  phone: z.string().trim().min(8).max(32),
+  code: z.string().regex(/^\d{6}$/, "code must contain six digits")
+});
+
 /**
  * Schema for emergency escalation POST /api/emergency/escalate
  */
@@ -63,5 +72,7 @@ const EmergencyEscalationSchema = z.object({
 module.exports = {
   TriageRequestSchema,
   BookingRequestSchema,
+  OtpRequestSchema,
+  OtpVerifySchema,
   EmergencyEscalationSchema
 };

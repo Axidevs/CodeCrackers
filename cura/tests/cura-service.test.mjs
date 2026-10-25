@@ -56,8 +56,36 @@ test('caregiver details, booking, and emergency escalation use the actual route 
   const booking = await service.createBooking({ caregiver_id: 'CG_001', slot_id: 'CG_001_1000' })
   assert.equal(booking.booking.status, 'confirmed')
   assert.deepEqual(JSON.parse(calls[1].options.body), { caregiver_id: 'CG_001', slot_id: 'CG_001_1000' })
+  assert.equal(calls[1].options.credentials, 'include')
   assert.equal((await service.escalateEmergency({ red_flags: ['chest_pain'] })).emergency, true)
   assert.equal(calls[2].url, `${service.CURA_API_BASE_URL}/api/emergency/escalate`)
+})
+
+test('phone authentication and booking history use cookie-backed API requests', async () => {
+  const calls = []
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), options })
+    if (String(url).endsWith('/api/auth/otp/request')) return Response.json({ success: true, delivery_mode: 'development', development_otp: '821563', message: 'No SMS sent' })
+    if (String(url).endsWith('/api/auth/otp/verify')) return Response.json({ success: true, user: { phone: '+919876543210' }, message: 'Verified' })
+    if (String(url).endsWith('/api/auth/me')) return Response.json({ success: true, user: null })
+    if (String(url).endsWith('/api/auth/logout')) return Response.json({ success: true, message: 'Signed out' })
+    return Response.json({ success: true, bookings: [] })
+  }
+
+  const otp = await service.requestPhoneOtp('+919876543210')
+  assert.equal(otp.delivery_mode, 'development')
+  assert.equal((await service.verifyPhoneOtp('+919876543210', otp.development_otp)).user.phone, '+919876543210')
+  assert.equal((await service.getCurrentUser()).user, null)
+  assert.deepEqual((await service.getMyBookings()).bookings, [])
+  await service.logout()
+  assert.deepEqual(calls.map(({ url }) => url.replace(service.CURA_API_BASE_URL, '')), [
+    '/api/auth/otp/request',
+    '/api/auth/otp/verify',
+    '/api/auth/me',
+    '/api/bookings/me',
+    '/api/auth/logout',
+  ])
+  assert.ok(calls.every(({ options }) => options.credentials === 'include'))
 })
 
 test('structured HTTP errors preserve status and code for conflicts and persistence failures', async () => {

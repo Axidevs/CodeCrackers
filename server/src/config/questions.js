@@ -21,6 +21,22 @@ const QUESTION_BANK = [
     options: ["Few hours", "1-2 days", "3-5 days", "More than a week"]
   },
   {
+    id: "headache_warning_signs",
+    category: "red_flag_check",
+    text_en: "Did the headache start suddenly and severely, or come with new weakness, confusion, vision changes, or trouble speaking?",
+    text_hi: "क्या सिरदर्द अचानक और बहुत तेज़ शुरू हुआ, या इसके साथ नई कमजोरी, भ्रम, नज़र में बदलाव या बोलने में परेशानी है?",
+    text_hinglish: "Kya sir dard achanak aur bahut tez shuru hua, ya nayi kamzori, confusion, nazar me badlav ya bolne me dikkat hai?",
+    options: ["No", "Yes"]
+  },
+  {
+    id: "headache_severity",
+    category: "severity",
+    text_en: "How severe is the headache, from mild to severe or 0 to 10?",
+    text_hi: "सिरदर्द कितना तेज़ है—हल्का, मध्यम, तेज़, या 0 से 10 तक?",
+    text_hinglish: "Sir dard kitna tez hai—halka, medium, severe, ya 0 se 10 tak?",
+    options: ["Mild", "Moderate", "Severe"]
+  },
+  {
     id: "fever_severity",
     category: "severity",
     text_en: "Is the fever very high (above 102°F) or accompanied by shivering?",
@@ -35,6 +51,14 @@ const QUESTION_BANK = [
     text_hi: "क्या मरीज़ क्लिनिक जा सकते हैं या घर पर देखभाल की ज़रूरत है?",
     text_hinglish: "Kya patient clinic ja sakte hain ya ghar par visit chahiye?",
     options: ["Can travel to clinic", "Need home visit", "Online consult preferred"]
+  },
+  {
+    id: "symptom_severity",
+    category: "severity",
+    text_en: "How severe is the main symptom, and is it getting worse?",
+    text_hi: "मुख्य लक्षण कितना गंभीर है, और क्या यह बढ़ रहा है?",
+    text_hinglish: "Main symptom kitna severe hai, aur kya yeh badh raha hai?",
+    options: ["Mild", "Moderate", "Severe", "Getting worse"]
   }
 ];
 

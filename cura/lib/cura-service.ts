@@ -77,6 +77,27 @@ export type BookingResponse = {
   notice: string
 }
 
+export type AuthUser = {
+  phone: string
+}
+
+export type OtpRequestResponse = {
+  success: true
+  delivery_mode: 'sms' | 'development'
+  development_otp?: string
+  message: string
+}
+
+export type BookingHistoryItem = {
+  booking_id: string
+  caregiver_id: string
+  caregiver_name: string
+  service: string
+  slot_time: string
+  status: string
+  booked_at: string
+}
+
 export type EscalationResponse = {
   success: true
   emergency: true
@@ -134,6 +155,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     response = await fetch(`${CURA_API_BASE_URL}${path}`, {
       ...init,
+      credentials: 'include',
       headers: {
         ...(init.body ? { 'Content-Type': 'application/json' } : {}),
         ...init.headers,
@@ -182,6 +204,26 @@ export function getCaregiver(caregiverId: string) {
 
 export function createBooking(payload: { caregiver_id: string; slot_id: string; patient_name?: string; notes?: string }) {
   return request<BookingResponse>('/api/booking', { method: 'POST', body: JSON.stringify(payload) })
+}
+
+export function requestPhoneOtp(phone: string) {
+  return request<OtpRequestResponse>('/api/auth/otp/request', { method: 'POST', body: JSON.stringify({ phone }) })
+}
+
+export function verifyPhoneOtp(phone: string, code: string) {
+  return request<{ success: true; user: AuthUser; message: string }>('/api/auth/otp/verify', { method: 'POST', body: JSON.stringify({ phone, code }) })
+}
+
+export function getCurrentUser() {
+  return request<{ success: true; user: AuthUser | null }>('/api/auth/me')
+}
+
+export function logout() {
+  return request<{ success: true; message: string }>('/api/auth/logout', { method: 'POST' })
+}
+
+export function getMyBookings() {
+  return request<{ success: true; bookings: BookingHistoryItem[] }>('/api/bookings/me')
 }
 
 export function escalateEmergency(payload: { red_flags?: string[]; patient_location?: { lat?: number; lng?: number }; notes?: string } = {}) {

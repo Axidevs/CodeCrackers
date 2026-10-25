@@ -16,9 +16,11 @@ describe("Follow-up question selection", () => {
       ]
     });
     assert.equal(second.follow_up_question, null);
+    assert.equal(second.is_ready_for_triage, false);
+    assert.equal(second.has_unresolved_question, true);
   });
 
-  test("does not repeat the breathing check when fever duration is provided", () => {
+  test("moves to fever severity after the breathing check and duration are answered", () => {
     const first = processIntake({ user_input: "I have fever", language: "english" });
     assert.equal(first.follow_up_question, "Are you or the patient experiencing any breathing difficulty or chest pain?");
 
@@ -30,6 +32,8 @@ describe("Follow-up question selection", () => {
         { role: "assistant", content: first.follow_up_question, is_question: true }
       ]
     });
-    assert.equal(second.follow_up_question, null);
+    assert.equal(second.follow_up_question, "Is the fever very high (above 102°F) or accompanied by shivering?");
+    assert.equal(second.is_ready_for_triage, false);
+    assert.deepEqual(second.symptoms, ["fever"]);
   });
 });

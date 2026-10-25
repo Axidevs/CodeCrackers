@@ -176,6 +176,17 @@ Emergency decisions are returned by the deterministic Safety Gate before the ML 
 ```
 - **Response**: `201 Created` with booking confirmation. If slot was already booked, returns `409 Conflict`.
 
+Authenticated booking requests are linked to the user verified by the `cura_session` HttpOnly cookie. Guest booking remains available. `GET /api/bookings/me` requires a session and returns only bookings whose stored owner matches that user; historical bookings without an owner are excluded.
+
+#### Phone Authentication
+- `POST /api/auth/otp/request` with `{ "phone": "+919876543210" }`
+- `POST /api/auth/otp/verify` with `{ "phone": "+919876543210", "code": "123456" }`
+- `GET /api/auth/me` returns the current user or `user: null`
+- `POST /api/auth/logout` revokes the current session
+- Successful verification creates or finds the user and sets a `HttpOnly` session cookie. Browser clients must send credentials.
+
+Set `SMS_PROVIDER=twilio` with `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_VERIFY_SERVICE_SID` to send and verify real SMS codes through Twilio Verify. `SMS_PROVIDER=development` returns a random code in the API response only when `NODE_ENV=development`; this mode sends no SMS and cannot be enabled in production. OTP request/verification limits and session lifetime are configurable in `.env.example`.
+
 #### Endpoint 4: Reset Demo Bookings
 - **Route**: `POST /api/demo/reset`
 - Clears the booking overlay and restores all initial caregiver slots to available.

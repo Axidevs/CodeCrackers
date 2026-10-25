@@ -4,11 +4,18 @@ require("dotenv").config();
 
 const apiRoutes = require("./routes");
 const { errorHandler } = require("./middleware/errorHandler");
+const env = require("./config/env");
 
 const app = express();
+const allowedOrigins = new Set(env.CORS_ORIGINS);
 
 // Standard middleware
-app.use(cors());
+app.use(cors({
+  origin(origin, callback) {
+    callback(null, !origin || allowedOrigins.has(origin));
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: "1mb" }));
 
 // Mount all CURA API routes

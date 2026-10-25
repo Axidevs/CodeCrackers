@@ -5,11 +5,32 @@ const os = require("node:os");
 const path = require("node:path");
 const app = require("../../src/app");
 const bookingService = require("../../src/services/booking.service");
+const { authService } = require("../../src/services/auth.service");
 
 let server;
 let baseUrl;
+let temporaryDirectory;
+let originalBookingStore;
+let originalAuthStore;
 
 before(async () => {
+  temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "cura-api-auth-test-"));
+  originalBookingStore = { path: bookingService.overlayPath, bookings: bookingService.bookings, bookedSlots: bookingService.bookedSlots };
+  originalAuthStore = {
+    path: authService.storePath,
+    store: authService.store,
+    nodeEnv: authService.nodeEnv,
+    smsProvider: authService.smsProvider
+  };
+  bookingService.overlayPath = path.join(temporaryDirectory, "bookings.json");
+  bookingService.bookings = [];
+  bookingService.bookedSlots = new Set();
+  authService.storePath = path.join(temporaryDirectory, "auth.json");
+  authService.store = { users: [], sessions: [] };
+  authService.nodeEnv = "development";
+  authService.smsProvider = "development";
+  authService.otpStates.clear();
+  authService.rateLimits.clear();
   await new Promise((resolve) => {
     server = app.listen(0, () => {
       const port = server.address().port;
@@ -21,7 +42,41 @@ before(async () => {
 
 after(async () => {
   await new Promise((resolve) => server.close(resolve));
+  bookingService.overlayPath = originalBookingStore.path;
+  bookingService.bookings = originalBookingStore.bookings;
+  bookingService.bookedSlots = originalBookingStore.bookedSlots;
+  authService.storePath = originalAuthStore.path;
+  authService.store = originalAuthStore.store;
+  authService.nodeEnv = originalAuthStore.nodeEnv;
+  authService.smsProvider = originalAuthStore.smsProvider;
+  authService.otpStates.clear();
+  authService.rateLimits.clear();
+  fs.rmSync(temporaryDirectory, { recursive: true, force: true });
 });
+
+async function signIn(phone) {
+  const request = await fetch(`${baseUrl}/api/auth/otp/request`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone })
+  });
+  assert.equal(request.status, 200);
+  const requestBody = await request.json();
+  assert.equal(requestBody.delivery_mode, "development");
+  const response = await fetch(`${baseUrl}/api/auth/otp/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone, code: requestBody.development_otp })
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("set-cookie").includes("HttpOnly"), true);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  const body = await response.json();
+  assert.equal(Object.hasOwn(body, "token"), false);
+  assert.equal(Object.hasOwn(body.user, "user_id"), false);
+  assert.equal(Object.hasOwn(body.user, "created_at"), false);
+  return response.headers.get("set-cookie").split(";")[0];
+}
 
 describe("CURA Backend API Integration Tests", () => {
   describe("GET /api/health", () => {
@@ -40,7 +95,7 @@ describe("CURA Backend API Integration Tests", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user_input: "papa ko do din se bukhar hai aur khansi bhi hai, saans lene me koi dikkat nahi",
+          user_input: "papa ko do din se bukhar hai aur khansi bhi hai, saans lene me koi dikkat nahi aur chest pain nahi hai, bukhar halka hai",
           language: "auto",
           location: { lat: 28.54, lng: 77.27 },
           conversation_history: []
@@ -200,6 +255,39 @@ describe("CURA Backend API Integration Tests", () => {
   });
 
   describe("POST /api/ui/triage (Extended UI Endpoint)", () => {
+    test("keeps the UI response envelope and does not conclude when a required answer is missing", async () => {
+      const firstResponse = await fetch(`${baseUrl}/api/ui/triage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_input: "I have a headache", language: "english" })
+      });
+      const firstBody = await firstResponse.json();
+      assert.equal(firstResponse.status, 200);
+      assert.equal(firstBody.success, true);
+      assert.equal(firstBody.trace.branch, "follow_up");
+      assert.equal(firstBody.decision.follow_up_question, "How long have these symptoms been present?");
+
+      const secondResponse = await fetch(`${baseUrl}/api/ui/triage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_input: "No",
+          language: "english",
+          conversation_history: [
+            { role: "user", content: "I have a headache" },
+            { role: "assistant", content: firstBody.decision.follow_up_question, is_question: true }
+          ]
+        })
+      });
+      const secondBody = await secondResponse.json();
+      assert.equal(secondResponse.status, 200);
+      assert.equal(secondBody.success, true);
+      assert.equal(secondBody.trace.branch, "insufficient_information");
+      assert.equal(secondBody.decision.care_type, "gp_teleconsult");
+      assert.match(secondBody.decision.reasoning, /No diagnosis has been made/);
+      assert.deepEqual(secondBody.decision.matched_caregivers, []);
+    });
+
     test("returns decision along with execution trace", async () => {
       const res = await fetch(`${baseUrl}/api/ui/triage`, {
         method: "POST",
@@ -333,6 +421,89 @@ describe("CURA Backend API Integration Tests", () => {
         bookingService.overlayPath = originalOverlayPath;
         fs.rmSync(directoryPath, { recursive: true, force: true });
       }
+    });
+  });
+
+  describe("phone authentication and private booking history", () => {
+    test("credentialed browser requests use the configured origin and reject untrusted mutations", async () => {
+      const allowed = await fetch(`${baseUrl}/api/auth/me`, { headers: { Origin: "http://localhost:3000" } });
+      assert.equal(allowed.headers.get("access-control-allow-origin"), "http://localhost:3000");
+      assert.equal(allowed.headers.get("access-control-allow-credentials"), "true");
+
+      const denied = await fetch(`${baseUrl}/api/auth/logout`, {
+        method: "POST",
+        headers: { Origin: "https://untrusted.example" }
+      });
+      assert.equal(denied.status, 403);
+    });
+
+    test("booking history is unavailable without a signed-in session", async () => {
+      const response = await fetch(`${baseUrl}/api/bookings/me`);
+      const body = await response.json();
+      assert.equal(response.status, 401);
+      assert.equal(body.error.code, "AUTHENTICATION_REQUIRED");
+    });
+
+    test("verified users see only their own bookings and guest bookings stay unowned", async () => {
+      const userACookie = await signIn("9876543210");
+      const userBCookie = await signIn("9876543211");
+      const userAResponse = await fetch(`${baseUrl}/api/auth/me`, { headers: { Cookie: userACookie } });
+      const userA = (await userAResponse.json()).user;
+      assert.equal(userA.phone, "+919876543210");
+      assert.equal(Object.hasOwn(userA, "user_id"), false);
+
+      const directoryResponse = await fetch(`${baseUrl}/api/caregivers`);
+      const caregivers = (await directoryResponse.json()).caregivers;
+      const bookingCandidates = caregivers.flatMap((caregiver) => caregiver.availability_slots
+        .filter((slot) => !slot.is_booked)
+        .map((slot) => ({ caregiver, slot }))).slice(0, 3);
+      assert.equal(bookingCandidates.length, 3);
+
+      const userABookingIds = [];
+      for (const { caregiver, slot } of bookingCandidates.slice(0, 2)) {
+        const created = await fetch(`${baseUrl}/api/booking`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: userACookie },
+          body: JSON.stringify({ caregiver_id: caregiver.caregiver_id, slot_id: slot.slot_id, user_id: "attacker-selected-owner" })
+        });
+        assert.equal(created.status, 201);
+        const createdBody = await created.json();
+        assert.equal(Object.hasOwn(createdBody.booking, "user_id"), false);
+        userABookingIds.push(createdBody.booking.booking_id);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      const guestBooking = await fetch(`${baseUrl}/api/booking`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caregiver_id: bookingCandidates[2].caregiver.caregiver_id, slot_id: bookingCandidates[2].slot.slot_id })
+      });
+      assert.equal(guestBooking.status, 201);
+
+      const userAHistoryResponse = await fetch(`${baseUrl}/api/bookings/me`, { headers: { Cookie: userACookie } });
+      const userAHistory = await userAHistoryResponse.json();
+      assert.equal(userAHistoryResponse.status, 200);
+      assert.equal(userAHistory.bookings.length, 2);
+      assert.equal(userAHistory.bookings[0].caregiver_name, bookingCandidates[1].caregiver.name);
+      assert.equal(userAHistory.bookings[0].service, bookingCandidates[1].caregiver.role);
+      assert.ok(userAHistory.bookings[0].booking_id);
+      assert.deepEqual(userAHistory.bookings.map((booking) => booking.booking_id), userABookingIds.reverse());
+
+      const userBHistory = await fetch(`${baseUrl}/api/bookings/me?user_id=some-other-account`, {
+        headers: { Cookie: userBCookie }
+      });
+      assert.deepEqual((await userBHistory.json()).bookings, []);
+
+      const logoutResponse = await fetch(`${baseUrl}/api/auth/logout`, { method: "POST", headers: { Cookie: userACookie } });
+      assert.equal(logoutResponse.status, 200);
+      const afterLogout = await fetch(`${baseUrl}/api/bookings/me`, { headers: { Cookie: userACookie } });
+      assert.equal(afterLogout.status, 401);
+    });
+
+    test("new accounts receive an empty booking history", async () => {
+      const cookie = await signIn("9876543212");
+      const response = await fetch(`${baseUrl}/api/bookings/me`, { headers: { Cookie: cookie } });
+      assert.equal(response.status, 200);
+      assert.deepEqual((await response.json()).bookings, []);
     });
   });
 
