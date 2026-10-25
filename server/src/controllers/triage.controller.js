@@ -5,6 +5,16 @@
 
 const { runPipeline } = require("../services/pipeline.service");
 const { EMERGENCY_PROTOCOL } = require("../config/safetyRules");
+const { authService } = require("../services/auth.service");
+
+function getPipelineRequest(req) {
+  const profile = req.authUser && authService.getProfile(req.authUser.user_id);
+  return {
+    ...req.body,
+    location: profile ? profile.location : req.authUser ? null : req.body.location,
+    require_service_location: Boolean(req.authUser && !profile?.location)
+  };
+}
 
 /**
  * Official Triage Endpoint: POST /api/triage
@@ -12,7 +22,7 @@ const { EMERGENCY_PROTOCOL } = require("../config/safetyRules");
  */
 async function handleOfficialTriage(req, res, next) {
   try {
-    const { decision } = await runPipeline(req.body);
+    const { decision } = await runPipeline(getPipelineRequest(req));
 
     // Filter matched caregivers to official output shape
     const formattedCaregivers = (decision.matched_caregivers || []).map((cg) => ({
@@ -46,7 +56,7 @@ async function handleOfficialTriage(req, res, next) {
  */
 async function handleUiTriage(req, res, next) {
   try {
-    const { decision, trace } = await runPipeline(req.body);
+    const { decision, trace } = await runPipeline(getPipelineRequest(req));
 
     return res.status(200).json({
       success: true,

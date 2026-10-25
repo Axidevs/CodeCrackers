@@ -5,6 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 const app = require("../../src/app");
 const bookingService = require("../../src/services/booking.service");
+const caregiverMatchingService = require("../../src/services/caregiverMatching.service");
 const { authService } = require("../../src/services/auth.service");
 
 let server;
@@ -443,6 +444,122 @@ describe("CURA Backend API Integration Tests", () => {
       const body = await response.json();
       assert.equal(response.status, 401);
       assert.equal(body.error.code, "AUTHENTICATION_REQUIRED");
+    });
+
+    test("new users complete and persist a validated profile without changing their verified phone", async () => {
+      const phone = "9876543213";
+      const cookie = await signIn(phone);
+      const currentResponse = await fetch(`${baseUrl}/api/auth/me`, { headers: { Cookie: cookie } });
+      const incompleteUser = (await currentResponse.json()).user;
+      assert.equal(incompleteUser.profile_complete, false);
+      assert.equal(incompleteUser.phone, "+91" + phone);
+      assert.equal(incompleteUser.full_name, "");
+
+      const unauthorized = await fetch(`${baseUrl}/api/auth/profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ full_name: "Anita Sharma", city: "Delhi", area: "Lajpat Nagar", pincode: "110024" })
+      });
+      assert.equal(unauthorized.status, 401);
+
+      const invalidPin = await fetch(`${baseUrl}/api/auth/profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Cookie: cookie },
+        body: JSON.stringify({ full_name: "Anita Sharma", city: "Delhi", area: "Lajpat Nagar", pincode: "011024" })
+      });
+      assert.equal(invalidPin.status, 422);
+
+      const invalidLocation = await fetch(`${baseUrl}/api/auth/profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Cookie: cookie },
+        body: JSON.stringify({
+          full_name: "Anita Sharma",
+          city: "Delhi",
+          area: "Lajpat Nagar",
+          pincode: "110024",
+          location: { lat: 91, lng: 77 }
+        })
+      });
+      assert.equal(invalidLocation.status, 422);
+
+      const profile = {
+        full_name: "Anita Sharma",
+        city: "Delhi",
+        area: "Lajpat Nagar",
+        pincode: "110024",
+        location: { lat: 28.5672, lng: 77.2433 },
+        phone: "+910000000000",
+        user_id: "attacker-selected-user"
+      };
+      const savedResponse = await fetch(`${baseUrl}/api/auth/profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Cookie: cookie },
+        body: JSON.stringify(profile)
+      });
+      assert.equal(savedResponse.status, 200);
+      const savedUser = (await savedResponse.json()).user;
+      assert.equal(savedUser.profile_complete, true);
+      assert.equal(savedUser.phone, "+91" + phone);
+      assert.equal(Object.hasOwn(savedUser, "user_id"), false);
+      assert.deepEqual(savedUser.location, profile.location);
+
+      const persistedResponse = await fetch(`${baseUrl}/api/auth/me`, { headers: { Cookie: cookie } });
+      assert.deepEqual((await persistedResponse.json()).user, savedUser);
+
+      const originalMatchCaregivers = caregiverMatchingService.matchCaregivers;
+      let matchingLocation;
+      let requiresLocation;
+      caregiverMatchingService.matchCaregivers = (options) => {
+        matchingLocation = options.user_location;
+        requiresLocation = options.require_service_location;
+        return [];
+      };
+      try {
+        const triageResponse = await fetch(`${baseUrl}/api/ui/triage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: cookie },
+          body: JSON.stringify({
+            user_input: "I have a headache for 2 days, mild, no sudden onset or weakness, confusion, vision changes, or trouble speaking",
+            language: "english",
+            location: { lat: -33.8688, lng: 151.2093 }
+          })
+        });
+        assert.equal(triageResponse.status, 200);
+        assert.deepEqual(matchingLocation, profile.location);
+        assert.equal(requiresLocation, false);
+      } finally {
+        caregiverMatchingService.matchCaregivers = originalMatchCaregivers;
+      }
+
+      const existingCookie = await signIn(phone);
+      const existingUserResponse = await fetch(`${baseUrl}/api/auth/me`, { headers: { Cookie: existingCookie } });
+      assert.equal((await existingUserResponse.json()).user.profile_complete, true);
+
+      const otherCookie = await signIn("9876543214");
+      const otherUserResponse = await fetch(`${baseUrl}/api/auth/me`, { headers: { Cookie: otherCookie } });
+      const otherUser = (await otherUserResponse.json()).user;
+      assert.equal(otherUser.profile_complete, false);
+      assert.equal(otherUser.full_name, "");
+      const originalMatcher = caregiverMatchingService.matchCaregivers;
+      let otherUserRequiresLocation;
+      caregiverMatchingService.matchCaregivers = (options) => {
+        otherUserRequiresLocation = options.require_service_location;
+        return [];
+      };
+      try {
+        const triageResponse = await fetch(`${baseUrl}/api/ui/triage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: otherCookie },
+          body: JSON.stringify({
+            user_input: "I have a headache for 2 days, mild, no sudden onset or weakness, confusion, vision changes, or trouble speaking"
+          })
+        });
+        assert.equal(triageResponse.status, 200);
+        assert.equal(otherUserRequiresLocation, true);
+      } finally {
+        caregiverMatchingService.matchCaregivers = originalMatcher;
+      }
+      authService.rateLimits.clear();
     });
 
     test("verified users see only their own bookings and guest bookings stay unowned", async () => {

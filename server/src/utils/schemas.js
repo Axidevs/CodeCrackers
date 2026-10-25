@@ -55,6 +55,17 @@ const OtpVerifySchema = z.object({
   code: z.string().regex(/^\d{6}$/, "code must contain six digits")
 });
 
+const ProfileUpdateSchema = z.object({
+  full_name: z.string().trim().min(2).max(100).regex(/^[\p{L}\p{M}][\p{L}\p{M} .'-]*$/u),
+  city: z.string().trim().min(2).max(100).regex(/^[\p{L}\p{M}\d][\p{L}\p{M}\d .,'-]*$/u),
+  area: z.string().trim().min(2).max(120).regex(/^[\p{L}\p{M}\d][\p{L}\p{M}\d .,'-]*$/u),
+  pincode: z.string().trim().regex(/^[1-9]\d{5}$/, "Enter a valid six-digit Indian PIN code"),
+  location: z.object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180)
+  }).nullable().optional()
+});
+
 /**
  * Schema for emergency escalation POST /api/emergency/escalate
  */
@@ -74,5 +85,6 @@ module.exports = {
   BookingRequestSchema,
   OtpRequestSchema,
   OtpVerifySchema,
+  ProfileUpdateSchema,
   EmergencyEscalationSchema
 };

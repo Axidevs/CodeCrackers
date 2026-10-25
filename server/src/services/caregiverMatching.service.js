@@ -20,7 +20,7 @@ const bookingService = require("./booking.service");
  * @param {string[]} [params.required_skills] - optional required skill tags
  * @returns {Array<object>} Ranked caregiver recommendations with reasons
  */
-function matchCaregivers({ care_type, urgency, user_location, language = "auto", required_skills = [] }) {
+function matchCaregivers({ care_type, urgency, user_location, require_service_location = false, language = "auto", required_skills = [] }) {
   // CRITICAL RULE: Emergency cases MUST NEVER receive routine caregiver matching
   if (care_type === CARE_TYPES.EMERGENCY_REFERRAL || urgency === URGENCIES.IMMEDIATE) {
     return [];
@@ -36,6 +36,7 @@ function matchCaregivers({ care_type, urgency, user_location, language = "auto",
   const hasLocation = user_location !== undefined && user_location !== null;
   const validUserLocation = Number.isFinite(user_location?.lat) && user_location.lat >= -90 && user_location.lat <= 90 &&
     Number.isFinite(user_location?.lng) && user_location.lng >= -180 && user_location.lng <= 180;
+  if (!isTeleconsult && require_service_location && !validUserLocation) return [];
   if (!isTeleconsult && hasLocation && !validUserLocation) return [];
 
   const allCaregivers = caregiverDataService.getAll();

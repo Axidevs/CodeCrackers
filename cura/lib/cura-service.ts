@@ -79,6 +79,12 @@ export type BookingResponse = {
 
 export type AuthUser = {
   phone: string
+  profile_complete: boolean
+  full_name: string
+  city: string
+  area: string
+  pincode: string
+  location: { lat: number; lng: number } | null
 }
 
 export type OtpRequestResponse = {
@@ -216,6 +222,19 @@ export function verifyPhoneOtp(phone: string, code: string) {
 
 export function getCurrentUser() {
   return request<{ success: true; user: AuthUser | null }>('/api/auth/me')
+}
+
+export function updateUserProfile(profile: {
+  full_name: string
+  city: string
+  area: string
+  pincode: string
+  location: { lat: number; lng: number } | null
+}) {
+  return request<{ success: true; user: AuthUser }>('/api/auth/profile', {
+    method: 'PUT',
+    body: JSON.stringify(profile),
+  })
 }
 
 export function logout() {

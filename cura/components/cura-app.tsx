@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { AlertTriangle, ArrowLeft, ArrowRight, CalendarDays, Check, ChevronRight, CircleHelp, HeartPulse, History, Languages, LogOut, MapPin, Mic, Phone, RotateCcw, ShieldCheck, Sparkles, Star, Stethoscope, UserRound } from 'lucide-react'
-import { getCaregivers, uiTriage, createBooking, escalateEmergency, isHealthConcern, CuraApiError, requestPhoneOtp, verifyPhoneOtp, getCurrentUser, logout, getMyBookings, type AuthUser, type BookingHistoryItem, type Caregiver, type CaregiverMatch, type CaregiverSlot, type TriageDecision, type EmergencyAction, type BookingResponse } from '@/lib/cura-service'
+import { getCaregivers, uiTriage, createBooking, escalateEmergency, isHealthConcern, CuraApiError, requestPhoneOtp, verifyPhoneOtp, getCurrentUser, updateUserProfile, logout, getMyBookings, type AuthUser, type BookingHistoryItem, type Caregiver, type CaregiverMatch, type CaregiverSlot, type TriageDecision, type EmergencyAction, type BookingResponse } from '@/lib/cura-service'
 import { EmergencyScreen } from './emergency-screen'
 
-type Screen = 'home' | 'intake' | 'questions' | 'loading' | 'recommendation' | 'caregivers' | 'booking' | 'success' | 'history' | 'emergency' | 'error'
+type Screen = 'home' | 'onboarding' | 'intake' | 'questions' | 'loading' | 'recommendation' | 'caregivers' | 'booking' | 'success' | 'history' | 'emergency' | 'error'
 type AuthMode = 'login' | 'signup' | 'account' | null
 type DisplayCaregiver = Caregiver & CaregiverMatch & { initials: string; color: string }
 type RecognitionEventLike = { resultIndex: number; results: ArrayLike<ArrayLike<{ transcript: string }>> }
@@ -50,7 +50,7 @@ function EditorialHome({ onStart, onEmergency }: { onStart: () => void; onEmerge
   </main>
 }
 
-function PhoneAuthDialog({ mode, user, statusMessage, onClose, onModeChange, onAuthenticated, onHistory, onLogout }: {
+function PhoneAuthDialog({ mode, user, statusMessage, onClose, onModeChange, onAuthenticated, onHistory, onLogout, onEditProfile }: {
   mode: Exclude<AuthMode, null>
   user: AuthUser | null
   statusMessage: string
@@ -59,6 +59,7 @@ function PhoneAuthDialog({ mode, user, statusMessage, onClose, onModeChange, onA
   onAuthenticated: (user: AuthUser) => void
   onHistory: () => void
   onLogout: () => Promise<void>
+  onEditProfile: () => void
 }) {
   const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
@@ -140,7 +141,7 @@ function PhoneAuthDialog({ mode, user, statusMessage, onClose, onModeChange, onA
         <p className="cura-kicker">My account</p>
         <h2 id="auth-dialog-title" className="font-display">Your CURA account</h2>
         <p>Signed in with <strong>{user.phone}</strong>.</p>
-        <div className="cura-account-actions"><button type="button" className="cura-primary-cta" onClick={onHistory}><History size={17} /> View my bookings</button><button type="button" className="cura-signout-button" disabled={isBusy} onClick={signOut}><LogOut size={16} /> {isBusy ? 'Signing out…' : 'Sign out'}</button></div>
+        <div className="cura-account-actions"><button type="button" className="cura-primary-cta" onClick={onHistory}><History size={17} /> View my bookings</button><button type="button" className="cura-signout-button" onClick={onEditProfile}><MapPin size={16} /> Edit profile and location</button><button type="button" className="cura-signout-button" disabled={isBusy} onClick={signOut}><LogOut size={16} /> {isBusy ? 'Signing out…' : 'Sign out'}</button></div>
       </> : <>
         <p className="cura-kicker">{mode === 'login' ? 'Welcome back' : 'Join CURA'}</p>
         <h2 id="auth-dialog-title" className="font-display">{otpResult ? 'Verify your phone' : mode === 'login' ? 'Log in to CURA' : 'Create your CURA account'}</h2>
@@ -210,7 +211,119 @@ function BookingHistoryScreen({ user, isCheckingSession, authStatus, onBack, onL
   </main>
 }
 
-function LivingHome({ onStart, onEmergency, user, isCheckingSession, authMode, authStatus, onAuthModeChange, onAuthenticated, onHistory, onLogout }: {
+function ProfileOnboarding({ user, onComplete, onCancel, onSignOut }: {
+  user: AuthUser
+  onComplete: (user: AuthUser) => void
+  onCancel: () => void
+  onSignOut: () => Promise<void>
+}) {
+  const [fullName, setFullName] = useState(user.full_name)
+  const [city, setCity] = useState(user.city)
+  const [area, setArea] = useState(user.area)
+  const [pincode, setPincode] = useState(user.pincode)
+  const [location, setLocation] = useState(user.location)
+  const [isLocating, setIsLocating] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const [error, setError] = useState('')
+  const [locationMessage, setLocationMessage] = useState('')
+
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationMessage('Location is unavailable in this browser. You can continue without GPS.')
+      return
+    }
+    setIsLocating(true)
+    setLocationMessage('')
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setLocation({ lat: coords.latitude, lng: coords.longitude })
+        setLocationMessage('Current coordinates added for caregiver distance matching.')
+        setIsLocating(false)
+      },
+      () => {
+        setLocationMessage('Location permission was not granted. You can continue without GPS.')
+        setIsLocating(false)
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    )
+  }
+
+  const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError('')
+    setIsSaving(true)
+    try {
+      const result = await updateUserProfile({ full_name: fullName, city, area, pincode, location })
+      onComplete(result.user)
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Your profile could not be saved.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const signOut = async () => {
+    setIsSigningOut(true)
+    setError('')
+    try {
+      await onSignOut()
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Could not sign out.')
+      setIsSigningOut(false)
+    }
+  }
+
+  return <main className="min-h-screen bg-[#f7f8f4] px-4 py-8 text-[#193c3b] sm:px-8 sm:py-14">
+    <div className="mx-auto w-full max-w-[720px]">
+      <div className="flex items-center justify-between">
+        <Logo />
+        {user.profile_complete && <button type="button" onClick={onCancel} className="min-h-11 rounded-xl border border-[#dfe5dd] px-4 text-sm font-semibold text-[#315443] hover:bg-white">Cancel</button>}
+      </div>
+      <section className="mt-8 rounded-[28px] border border-[#e4e9e1] bg-white p-5 shadow-[0_18px_55px_rgba(31,65,48,.08)] sm:mt-12 sm:p-9">
+        <p className="text-xs font-bold uppercase tracking-[.18em] text-[#6e9277]">{user.profile_complete ? 'Your profile' : 'A quick introduction'}</p>
+        <h1 className="mt-3 font-display text-3xl font-medium tracking-[-.04em] sm:text-4xl">{user.profile_complete ? 'Update your service location.' : 'Let’s make care feel closer.'}</h1>
+        <p className="mt-3 max-w-xl text-sm leading-6 text-[#64736b]">Your verified phone is saved to your account. Add your name and general service area; you won’t need to enter a home address here.</p>
+        <form className="mt-7 grid gap-4 sm:grid-cols-2" onSubmit={saveProfile}>
+          <label className="grid gap-2 text-sm font-semibold text-[#315443] sm:col-span-2">Full name
+            <input autoComplete="name" required minLength={2} maxLength={100} value={fullName} onChange={(event) => setFullName(event.target.value)} className="min-h-12 rounded-xl border border-[#dfe5dd] px-4 font-normal outline-none focus:border-[#6e9277] focus:ring-4 focus:ring-[#e7f0e5]" />
+          </label>
+          <label className="grid gap-2 text-sm font-semibold text-[#315443] sm:col-span-2">Verified phone number
+            <input type="tel" value={user.phone} readOnly aria-readonly="true" className="min-h-12 rounded-xl border border-[#e4e9e1] bg-[#f7f8f4] px-4 font-normal text-[#64736b]" />
+          </label>
+          <label className="grid gap-2 text-sm font-semibold text-[#315443]">City
+            <input autoComplete="address-level2" required minLength={2} maxLength={100} value={city} onChange={(event) => setCity(event.target.value)} className="min-h-12 rounded-xl border border-[#dfe5dd] px-4 font-normal outline-none focus:border-[#6e9277] focus:ring-4 focus:ring-[#e7f0e5]" />
+          </label>
+          <label className="grid gap-2 text-sm font-semibold text-[#315443]">Area / locality
+            <input autoComplete="address-level3" required minLength={2} maxLength={120} value={area} onChange={(event) => setArea(event.target.value)} className="min-h-12 rounded-xl border border-[#dfe5dd] px-4 font-normal outline-none focus:border-[#6e9277] focus:ring-4 focus:ring-[#e7f0e5]" />
+          </label>
+          <label className="grid gap-2 text-sm font-semibold text-[#315443] sm:col-span-2">PIN code
+            <input autoComplete="postal-code" inputMode="numeric" pattern="[1-9][0-9]{5}" required minLength={6} maxLength={6} value={pincode} onChange={(event) => setPincode(event.target.value.replace(/\D/g, '').slice(0, 6))} className="min-h-12 rounded-xl border border-[#dfe5dd] px-4 font-normal outline-none focus:border-[#6e9277] focus:ring-4 focus:ring-[#e7f0e5]" />
+            <span className="text-xs font-normal text-[#849188]">Enter a valid six-digit Indian PIN code.</span>
+          </label>
+          <div className="sm:col-span-2">
+            <div className="rounded-2xl border border-[#e2ebe1] bg-[#f7faf6] p-4">
+              <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <div><p className="flex items-center gap-2 text-sm font-semibold text-[#315443]"><MapPin size={16} aria-hidden="true" /> Optional: use current location</p><p className="mt-1 text-xs leading-5 text-[#738178]">Only shared after you choose; coordinates help the existing caregiver distance filter.</p></div>
+                <button type="button" onClick={useCurrentLocation} disabled={isLocating} className="min-h-11 shrink-0 rounded-xl border border-[#cbdacb] bg-white px-4 text-sm font-semibold text-[#315443] hover:bg-[#edf3ed] disabled:opacity-60">{isLocating ? 'Getting location…' : location ? 'Refresh GPS location' : 'Use my location'}</button>
+              </div>
+              {location && <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#e2ebe1] pt-3 text-xs text-[#64736b]"><span>GPS coordinates saved for matching.</span><button type="button" onClick={() => { setLocation(null); setLocationMessage('GPS location removed.') }} className="font-semibold text-[#315443] underline underline-offset-2">Remove</button></div>}
+              {locationMessage && <p role="status" className="mt-3 text-xs text-[#597065]">{locationMessage}</p>}
+            </div>
+          </div>
+          <p className="text-xs leading-5 text-[#849188] sm:col-span-2">City, area, and PIN code are saved to your profile. They do not by themselves confirm caregiver coverage. No exact home address is requested.</p>
+          {error && <p role="alert" className="text-sm text-[#9a4d39] sm:col-span-2">{error}</p>}
+          <div className="flex flex-col gap-3 pt-1 sm:col-span-2 sm:flex-row sm:items-center">
+            <button type="submit" disabled={isSaving || isLocating} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#174a39] px-5 text-sm font-semibold text-white hover:bg-[#24634d] disabled:opacity-60">{isSaving ? 'Saving profile…' : user.profile_complete ? 'Save profile' : 'Save and continue'} <ArrowRight size={17} /></button>
+            {!user.profile_complete && <button type="button" disabled={isSigningOut} onClick={() => void signOut()} className="min-h-12 rounded-xl border border-[#dfe5dd] px-5 text-sm font-semibold text-[#315443] hover:bg-[#f7f8f4]">{isSigningOut ? 'Signing out…' : 'Continue without an account'}</button>}
+          </div>
+        </form>
+      </section>
+    </div>
+  </main>
+}
+
+function LivingHome({ onStart, onEmergency, user, isCheckingSession, authMode, authStatus, onAuthModeChange, onAuthenticated, onHistory, onLogout, onEditProfile }: {
   onStart: () => void
   onEmergency: () => void
   user: AuthUser | null
@@ -221,6 +334,7 @@ function LivingHome({ onStart, onEmergency, user, isCheckingSession, authMode, a
   onAuthenticated: (user: AuthUser) => void
   onHistory: () => void
   onLogout: () => Promise<void>
+  onEditProfile: () => void
 }) {
   const [active, setActive] = useState(0)
   const closeAuth = useCallback(() => onAuthModeChange(null), [onAuthModeChange])
@@ -248,7 +362,7 @@ function LivingHome({ onStart, onEmergency, user, isCheckingSession, authMode, a
     <section id="help-cura" className="cura-help-section"><div><p className="cura-kicker">Help & safety</p><h2 className="font-display">A few things to know.</h2></div><div className="cura-help-list"><article><h3>Is this a diagnosis?</h3><p>No. CURA provides general care-navigation guidance, not a confirmed diagnosis.</p></article><article><h3>What if I need urgent help?</h3><p>Use the urgent-help option for guidance. CURA cannot contact emergency services for you.</p><button onClick={onEmergency}>Open urgent-help guidance <ArrowRight size={16} aria-hidden="true" /></button></article><article><h3>Can I book a caregiver?</h3><p>If the care service returns caregiver matches and open demo slots, you can review them and submit a booking for backend confirmation.</p></article></div></section>
     <section className="cura-safety-note" aria-label="Important care information"><ShieldCheck size={21} aria-hidden="true" /><p>CURA offers general care-navigation guidance, not a diagnosis. If someone may be in immediate danger, contact local emergency services.</p><button onClick={onEmergency}>Urgent help <ArrowRight size={16} aria-hidden="true" /></button></section>
     <footer className="cura-living-footer"><a href="#living-top" className="cura-footer-brand">Cura <span>Care, with clarity.</span></a><nav aria-label="Footer navigation"><a href="#about-cura">About CURA</a><a href="#help-cura">Help & safety</a><button type="button" onClick={onHistory}>History</button><button type="button" aria-haspopup="dialog" onClick={() => onAuthModeChange(user ? 'account' : 'login')}>{user ? 'My account' : 'Log in'}</button></nav><button onClick={onEmergency}>Emergency support</button></footer>
-    {authMode && <PhoneAuthDialog mode={authMode} user={user} statusMessage={authStatus} onClose={closeAuth} onModeChange={onAuthModeChange} onAuthenticated={onAuthenticated} onHistory={onHistory} onLogout={onLogout} />}
+    {authMode && <PhoneAuthDialog mode={authMode} user={user} statusMessage={authStatus} onClose={closeAuth} onModeChange={onAuthModeChange} onAuthenticated={onAuthenticated} onHistory={onHistory} onLogout={onLogout} onEditProfile={onEditProfile} />}
   </main>
 }
 
@@ -288,7 +402,10 @@ export default function CuraApp() {
   useEffect(() => {
     let cancelled = false
     getCurrentUser().then((result) => {
-      if (!cancelled) setAuthUser(result.user)
+      if (!cancelled) {
+        setAuthUser(result.user)
+        if (result.user && !result.user.profile_complete) setScreen('onboarding')
+      }
     }).catch((requestError) => {
       if (!cancelled) setAuthStatus(requestError instanceof Error ? requestError.message : 'Your sign-in status could not be checked.')
     }).finally(() => {
@@ -372,7 +489,7 @@ export default function CuraApp() {
     triageInFlight.current = true
     setError(''); setScreen('loading'); setIsLoading(true)
     try {
-      const result = await uiTriage({ user_input: input, language: languageCode, conversation_history: [] })
+      const result = await uiTriage({ user_input: input, language: languageCode, conversation_history: [], location: authUser?.location || undefined })
       await showDecision(result.decision, [{ role: 'user', content: input }], result.trace.confidence)
     } catch (requestError) {
       if (requestError instanceof CuraApiError && requestError.code === 'INVALID_HEALTH_INPUT') {
@@ -400,7 +517,7 @@ export default function CuraApp() {
     setFollowupVoiceError('')
     setError(''); setScreen('loading'); setIsLoading(true)
     try {
-      const result = await uiTriage({ user_input: answer, language: languageCode, conversation_history: conversationHistory })
+      const result = await uiTriage({ user_input: answer, language: languageCode, conversation_history: conversationHistory, location: authUser?.location || undefined })
       await showDecision(result.decision, history, result.trace.confidence)
       setAnswerDraft('')
     } catch (requestError) {
@@ -476,8 +593,15 @@ export default function CuraApp() {
     setAuthUser(null)
     setAuthStatus('')
     setAuthMode(null)
+    setScreen('home')
   }
   const layoutClass = 'mx-auto flex min-h-[calc(100vh-82px)] w-full max-w-[1180px] flex-col px-5 pb-10 sm:px-10'
+  if (screen === 'onboarding' && authUser) return <ProfileOnboarding
+    user={authUser}
+    onComplete={(user) => { setAuthUser(user); setScreen('home'); setAuthStatus('') }}
+    onCancel={() => setScreen('home')}
+    onSignOut={signOut}
+  />
   if (screen === 'home') return <LivingHome
     onStart={beginAssessment}
     onEmergency={emergency}
@@ -486,9 +610,10 @@ export default function CuraApp() {
     authMode={authMode}
     authStatus={authStatus}
     onAuthModeChange={setAuthMode}
-    onAuthenticated={(user) => { setAuthUser(user); setAuthStatus(''); setAuthMode(null) }}
+    onAuthenticated={(user) => { setAuthUser(user); setAuthStatus(''); setAuthMode(null); if (!user.profile_complete) setScreen('onboarding') }}
     onHistory={openHistory}
     onLogout={signOut}
+    onEditProfile={() => { setAuthMode(null); setScreen('onboarding') }}
   />
   if (screen === 'history') return <BookingHistoryScreen
     user={authUser}

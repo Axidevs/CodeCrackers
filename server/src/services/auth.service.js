@@ -24,6 +24,22 @@ function hash(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
 
+function isProfileComplete(user) {
+  return Boolean(user?.full_name && user?.city && user?.area && user?.pincode);
+}
+
+function toPublicUser(user) {
+  return {
+    phone: user.phone,
+    profile_complete: isProfileComplete(user),
+    full_name: user.full_name || "",
+    city: user.city || "",
+    area: user.area || "",
+    pincode: user.pincode || "",
+    location: user.location || null
+  };
+}
+
 class AuthService {
   constructor(options = {}) {
     this.storePath = options.storePath || env.AUTH_STORE_PATH;
@@ -191,9 +207,33 @@ class AuthService {
     });
     this.persistStore({ users, sessions });
     return {
-      user: { phone: user.phone },
+      user: toPublicUser(user),
       token
     };
+  }
+
+  getProfile(userId) {
+    const user = this.store.users.find((candidate) => candidate.user_id === userId);
+    return user ? toPublicUser(user) : null;
+  }
+
+  updateProfile(userId, profile) {
+    const userIndex = this.store.users.findIndex((candidate) => candidate.user_id === userId);
+    if (userIndex === -1) {
+      throw serviceError(404, "USER_NOT_FOUND", "The signed-in account could not be found.");
+    }
+    const users = this.store.users.map((user, index) => index === userIndex
+      ? {
+          ...user,
+          full_name: profile.full_name,
+          city: profile.city,
+          area: profile.area,
+          pincode: profile.pincode,
+          location: profile.location || null
+        }
+      : user);
+    this.persistStore({ ...this.store, users });
+    return toPublicUser(users[userIndex]);
   }
 
   async checkTwilioVerification(phone, code) {

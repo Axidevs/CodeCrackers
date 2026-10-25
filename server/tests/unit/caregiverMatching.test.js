@@ -80,6 +80,23 @@ describe("Caregiver Matching Engine Tests", () => {
     assert.deepEqual(results, [], "Unsupported role must return empty list");
   });
 
+  test("requires confirmed coordinates before showing signed-in in-person service matches", () => {
+    const withoutLocation = matchCaregivers({
+      care_type: "paramedic_home_visit",
+      urgency: "routine",
+      require_service_location: true
+    });
+    const withLocation = matchCaregivers({
+      care_type: "paramedic_home_visit",
+      urgency: "routine",
+      user_location: { lat: 28.54, lng: 77.27 },
+      require_service_location: true
+    });
+
+    assert.deepEqual(withoutLocation, []);
+    assert.ok(withLocation.length > 0);
+  });
+
   test("enforces configured maximum distance and caregiver service radius", () => {
     const originalGetAll = caregiverDataService.getAll;
     caregiverDataService.getAll = () => [

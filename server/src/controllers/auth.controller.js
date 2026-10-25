@@ -30,7 +30,24 @@ function getCurrentUser(req, res) {
   res.set("Cache-Control", "no-store");
   const user = authService.getSession(getSessionToken(req));
   if (!user) return res.status(200).json({ success: true, user: null });
-  return res.status(200).json({ success: true, user: { phone: user.phone } });
+  return res.status(200).json({ success: true, user: authService.getProfile(user.user_id) });
+}
+
+function updateProfile(req, res, next) {
+  try {
+    res.set("Cache-Control", "no-store");
+    const profile = {
+      ...req.body,
+      city: req.body.city.trim(),
+      area: req.body.area.trim()
+    };
+    return res.status(200).json({
+      success: true,
+      user: authService.updateProfile(req.authUser.user_id, profile)
+    });
+  } catch (error) {
+    next(error);
+  }
 }
 
 function logout(req, res, next) {
@@ -44,4 +61,4 @@ function logout(req, res, next) {
   }
 }
 
-module.exports = { requestOtp, verifyOtp, getCurrentUser, logout };
+module.exports = { requestOtp, verifyOtp, getCurrentUser, updateProfile, logout };

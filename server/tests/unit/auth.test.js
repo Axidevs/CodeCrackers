@@ -55,6 +55,35 @@ test("development OTP verifies, creates a user, and persists only a hashed sessi
   assert.equal(service.store.users[0].user_id, verifiedUserId);
 });
 
+test("profile completion is persisted against the authenticated user record", async () => {
+  const service = createAuthService();
+  const firstOtp = await service.requestOtp("9876543210", "profile-client-a");
+  const firstSession = await service.verifyOtp("9876543210", firstOtp.development_otp);
+  const firstUserId = service.getSession(firstSession.token).user_id;
+  assert.equal(firstSession.user.profile_complete, false);
+
+  const secondOtp = await service.requestOtp("9876543211", "profile-client-b");
+  const secondSession = await service.verifyOtp("9876543211", secondOtp.development_otp);
+  const secondUserId = service.getSession(secondSession.token).user_id;
+  const profile = {
+    full_name: "Anita Sharma",
+    city: "Delhi",
+    area: "Lajpat Nagar",
+    pincode: "110024",
+    location: { lat: 28.5672, lng: 77.2433 }
+  };
+
+  const saved = service.updateProfile(firstUserId, profile);
+  assert.equal(saved.profile_complete, true);
+  assert.equal(saved.phone, firstSession.user.phone);
+  assert.deepEqual(saved.location, profile.location);
+  assert.equal(service.getProfile(secondUserId).profile_complete, false);
+
+  const reloaded = new AuthService({ storePath: service.storePath, nodeEnv: "development", smsProvider: "development" });
+  assert.deepEqual(reloaded.getProfile(firstUserId), saved);
+  assert.equal(reloaded.getProfile(secondUserId).full_name, "");
+});
+
 test("invalid OTPs consume the configured attempt limit", async () => {
   const service = createAuthService({ otpVerifyAttemptLimit: 2 });
   await service.requestOtp("+919876543210", "attempt-client");

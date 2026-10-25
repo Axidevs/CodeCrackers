@@ -68,6 +68,7 @@ test('phone authentication and booking history use cookie-backed API requests', 
     if (String(url).endsWith('/api/auth/otp/request')) return Response.json({ success: true, delivery_mode: 'development', development_otp: '821563', message: 'No SMS sent' })
     if (String(url).endsWith('/api/auth/otp/verify')) return Response.json({ success: true, user: { phone: '+919876543210' }, message: 'Verified' })
     if (String(url).endsWith('/api/auth/me')) return Response.json({ success: true, user: null })
+    if (String(url).endsWith('/api/auth/profile')) return Response.json({ success: true, user: { phone: '+919876543210', profile_complete: true } })
     if (String(url).endsWith('/api/auth/logout')) return Response.json({ success: true, message: 'Signed out' })
     return Response.json({ success: true, bookings: [] })
   }
@@ -76,16 +77,21 @@ test('phone authentication and booking history use cookie-backed API requests', 
   assert.equal(otp.delivery_mode, 'development')
   assert.equal((await service.verifyPhoneOtp('+919876543210', otp.development_otp)).user.phone, '+919876543210')
   assert.equal((await service.getCurrentUser()).user, null)
+  const profile = { full_name: 'Anita Sharma', city: 'Delhi', area: 'Lajpat Nagar', pincode: '110024', location: null }
+  assert.equal((await service.updateUserProfile(profile)).user.profile_complete, true)
   assert.deepEqual((await service.getMyBookings()).bookings, [])
   await service.logout()
   assert.deepEqual(calls.map(({ url }) => url.replace(service.CURA_API_BASE_URL, '')), [
     '/api/auth/otp/request',
     '/api/auth/otp/verify',
     '/api/auth/me',
+    '/api/auth/profile',
     '/api/bookings/me',
     '/api/auth/logout',
   ])
   assert.ok(calls.every(({ options }) => options.credentials === 'include'))
+  assert.equal(calls[3].options.method, 'PUT')
+  assert.deepEqual(JSON.parse(calls[3].options.body), profile)
 })
 
 test('structured HTTP errors preserve status and code for conflicts and persistence failures', async () => {

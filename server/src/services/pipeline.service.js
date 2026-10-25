@@ -166,6 +166,7 @@ async function runPipeline(request) {
     care_type: triageResult.care_type,
     urgency: triageResult.urgency,
     user_location: request.location,
+    require_service_location: request.require_service_location,
     language: intake.language
   });
 
