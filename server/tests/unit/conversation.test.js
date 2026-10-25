@@ -8,6 +8,7 @@ async function withStubbedTriage(callback) {
   const originalPredictTriage = mlTriageService.predictTriage;
   const originalMatchCaregivers = caregiverMatchingService.matchCaregivers;
   let mlCalls = 0;
+  let matchingCalls = 0;
 
   mlTriageService.predictTriage = async () => {
     mlCalls += 1;
@@ -19,10 +20,13 @@ async function withStubbedTriage(callback) {
       source: "test"
     };
   };
-  caregiverMatchingService.matchCaregivers = () => [];
+  caregiverMatchingService.matchCaregivers = () => {
+    matchingCalls += 1;
+    return [];
+  };
 
   try {
-    await callback(() => mlCalls);
+    await callback(() => mlCalls, () => matchingCalls);
   } finally {
     mlTriageService.predictTriage = originalPredictTriage;
     caregiverMatchingService.matchCaregivers = originalMatchCaregivers;
@@ -91,12 +95,128 @@ test("insufficient duration information does not trigger a model conclusion", as
     assert.equal(getMlCalls(), 0);
     assert.equal(result.trace.branch, "insufficient_information");
     assert.equal(result.decision.follow_up_question, null);
-    assert.equal(result.decision.care_type, "gp_teleconsult");
-    assert.match(result.decision.reasoning, /not enough information/i);
-    assert.match(result.decision.reasoning, /No diagnosis has been made/);
+    assert.equal(result.decision.care_type, null);
+    assert.equal(result.decision.urgency, null);
+    assert.match(result.decision.reasoning, /not enough consistent information/i);
+    assert.match(result.decision.reasoning, /No diagnosis/i);
     assert.deepEqual(result.decision.matched_caregivers, []);
   });
 });
+
+test("contradictory severe and mild headache answers request clarification without a recommendation", async () => {
+  await withStubbedTriage(async (getMlCalls) => {
+    const conversation = createConversation();
+    await conversation.send("I have a severe headache");
+    await conversation.send("Since yesterday");
+    const result = await conversation.send("No warning signs, and I don't have the headache anymore");
+
+    assert.equal(getMlCalls(), 0);
+    assert.equal(result.trace.branch, "follow_up");
+    assert.equal(result.decision.care_type, null);
+    assert.equal(result.decision.matched_caregivers.length, 0);
+    assert.match(result.decision.follow_up_question, /described the headache as severe/i);
+  });
+});
+
+test("not sure on a critical breathing question remains unknown, not no", async () => {
+    await withStubbedTriage(async (getMlCalls, getMatchingCalls) => {
+      const conversation = createConversation();
+      await conversation.send("I have a fever");
+      const result = await conversation.send("I'm not sure");
+
+      assert.equal(getMlCalls(), 0);
+      assert.equal(getMatchingCalls(), 0);
+      assert.equal(result.trace.branch, "insufficient_information");
+      assert.equal(result.decision.care_type, null);
+      assert.equal(result.decision.urgency, null);
+      assert.deepEqual(result.decision.matched_caregivers, []);
+      assert.match(result.decision.reasoning, /not enough consistent information/i);
+    });
+  });
+
+  test("conflicting symptom durations are clarified instead of choosing the latest silently", async () => {
+    await withStubbedTriage(async (getMlCalls) => {
+      const result = await runPipeline({
+        user_input: "No, it has been 7 days",
+        language: "english",
+        conversation_history: [
+          { role: "user", content: "I have a headache" },
+          { role: "assistant", content: "How long have these symptoms been present?", is_question: true },
+          { role: "user", content: "2 days" },
+          {
+            role: "assistant",
+            content: "Did the headache start suddenly and severely, or come with new weakness, confusion, vision changes, or trouble speaking?",
+            is_question: true
+          }
+        ]
+      });
+
+      assert.equal(getMlCalls(), 0);
+      assert.equal(result.trace.branch, "follow_up");
+      assert.match(result.decision.follow_up_question, /mentioned different symptom durations/i);
+      assert.deepEqual(result.decision.matched_caregivers, []);
+    });
+  });
+
+  test("a clear answer to a contradiction resumes triage using the clarification", async () => {
+    await withStubbedTriage(async (getMlCalls) => {
+      const conversation = createConversation();
+      await conversation.send("I have a severe headache");
+      await conversation.send("Since yesterday");
+      const clarification = await conversation.send("No warning signs, and I don't have the headache anymore");
+      assert.match(clarification.decision.follow_up_question, /described the headache as severe/i);
+      const result = await conversation.send("Moderate");
+
+      assert.equal(result.trace.branch, "final");
+      assert.equal(result.decision.follow_up_question, null);
+      assert.equal(getMlCalls(), 1);
+    });
+  });
+
+test("unanswered critical information never reaches caregiver matching", async () => {
+    await withStubbedTriage(async (getMlCalls, getMatchingCalls) => {
+      const conversation = createConversation();
+      await conversation.send("I have a headache");
+      const result = await conversation.send("I don't know");
+
+      assert.equal(result.trace.branch, "insufficient_information");
+      assert.equal(result.decision.care_type, null);
+      assert.deepEqual(result.decision.matched_caregivers, []);
+      assert.equal(getMlCalls(), 0);
+      assert.equal(getMatchingCalls(), 0);
+    });
+  });
+
+test("red flag reported after routine answers immediately overrides clarification", async () => {
+    await withStubbedTriage(async (getMlCalls, getMatchingCalls) => {
+      const conversation = createConversation();
+      await conversation.send("I have a fever");
+      await conversation.send("No breathing difficulty or chest pain, fever for 2 days");
+      const result = await conversation.send("Now I have crushing chest pain");
+
+      assert.equal(result.trace.branch, "emergency");
+      assert.equal(result.decision.care_type, "emergency_referral");
+      assert.equal(result.decision.urgency, "immediate");
+      assert.deepEqual(result.decision.matched_caregivers, []);
+      assert.equal(getMlCalls(), 0);
+      assert.equal(getMatchingCalls(), 0);
+    });
+  });
+
+test("consistent complete answers still use the existing final triage flow", async () => {
+    await withStubbedTriage(async (getMlCalls, getMatchingCalls) => {
+      const conversation = createConversation();
+      await conversation.send("I have a headache");
+      await conversation.send("Since yesterday");
+      await conversation.send("No sudden onset, weakness, confusion, vision, or speech changes");
+      const result = await conversation.send("Mild");
+
+      assert.equal(result.trace.branch, "final");
+      assert.equal(result.decision.care_type, "gp_teleconsult");
+      assert.equal(getMlCalls(), 1);
+      assert.equal(getMatchingCalls(), 1);
+    });
+  });
 
 test("prior answers are retained and already answered questions are not repeated", async () => {
   await withStubbedTriage(async (getMlCalls) => {

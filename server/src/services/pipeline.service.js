@@ -57,13 +57,29 @@ async function runPipeline(request) {
   });
 
   // Step 3: Full Independent Deterministic Safety Gate Evaluation
-  // Evaluates complete conversation context
+  // Evaluate each turn independently so a later denial cannot erase a prior red flag.
   const safetyText = intake.affirmative_headache_warning
     ? `${intake.full_text} sudden severe headache`
     : intake.affirmative_breathing_or_chest_check
       ? `${intake.full_text} severe shortness of breath`
       : intake.full_text;
-  const safetyResult = evaluateSafety(safetyText);
+  const userMessages = [
+    ...conversationHistory.filter((message) => message.role === "user").map((message) => message.content),
+    userInput
+  ];
+  const turnSafetyResults = userMessages.map((message) => evaluateSafety(message)).filter((result) => result.is_emergency);
+  if (intake.affirmative_headache_warning) {
+    turnSafetyResults.push(evaluateSafety("sudden severe headache"));
+  }
+  if (intake.affirmative_breathing_or_chest_check) {
+    turnSafetyResults.push(evaluateSafety("severe shortness of breath"));
+  }
+  const safetyResult = turnSafetyResults.length > 0
+    ? {
+      ...turnSafetyResults[0],
+      red_flags: [...new Set(turnSafetyResults.flatMap((result) => result.red_flags))]
+    }
+    : evaluateSafety(safetyText);
 
   // BRANCH A: Emergency Red Flag Triggered
   if (safetyResult.is_emergency) {
@@ -121,10 +137,10 @@ async function runPipeline(request) {
     return {
       decision: {
         follow_up_question: null,
-        care_type: CARE_TYPES.GP_TELECONSULT,
-        urgency: URGENCIES.SAME_DAY,
+        care_type: null,
+        urgency: null,
         red_flags: [],
-        reasoning: "There is not enough information to safely determine an appropriate care pathway. No diagnosis has been made. Please seek evaluation from a qualified healthcare professional; if symptoms become severe or urgent, contact local emergency services.",
+        reasoning: "There is not enough consistent information to safely determine an appropriate care pathway. No diagnosis or caregiver recommendation has been made. Please seek evaluation from a qualified healthcare professional; if symptoms become severe or urgent, contact local emergency services.",
         matched_caregivers: []
       },
       trace: {

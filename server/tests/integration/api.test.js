@@ -283,8 +283,9 @@ describe("CURA Backend API Integration Tests", () => {
       assert.equal(secondResponse.status, 200);
       assert.equal(secondBody.success, true);
       assert.equal(secondBody.trace.branch, "insufficient_information");
-      assert.equal(secondBody.decision.care_type, "gp_teleconsult");
-      assert.match(secondBody.decision.reasoning, /No diagnosis has been made/);
+      assert.equal(secondBody.decision.care_type, null);
+      assert.equal(secondBody.decision.urgency, null);
+      assert.match(secondBody.decision.reasoning, /No diagnosis or caregiver recommendation has been made/);
       assert.deepEqual(secondBody.decision.matched_caregivers, []);
     });
 

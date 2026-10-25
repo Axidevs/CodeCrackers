@@ -10,6 +10,15 @@ const { isNegated } = require("./safetyGate.service");
 
 const MAX_QUESTION_BUDGET = 4;
 const QUESTIONS_BY_ID = new Map(QUESTION_BANK.map((question) => [question.id, question]));
+const CLARIFICATION_QUESTIONS = {
+  symptom_duration: "symptom_duration_clarification",
+  headache_severity: "headache_severity_clarification",
+  symptom_severity: "symptom_severity_clarification",
+  fever_severity: "fever_severity_clarification",
+  headache_warning_signs: "headache_warning_clarification",
+  breathing_or_chest_check: "breathing_or_chest_clarification"
+};
+const UNKNOWN_ANSWER = /\b(?:i\s+)?(?:don['’]?t\s+know|do\s+not\s+know|not\s+sure|not\s+certain|unsure|uncertain|maybe|perhaps|no\s+idea|can['’]?t\s+(?:say|remember)|cannot\s+(?:say|remember)|pata\s+nahi|malum\s+nahi|maalum\s+nahi)\b|(?:पता नहीं|नहीं पता|अनिश्चित)/i;
 
 /**
  * Extracts symptom markers from text
@@ -81,23 +90,197 @@ function identifyQuestion(text) {
 
 function collectQuestionAnswers(conversation_history, user_input) {
   const answers = new Map();
+  const responses = [];
+  const userTurns = [];
+  const clarificationAsked = new Set();
   let pendingQuestion = null;
 
   for (const message of [...conversation_history, { role: "user", content: user_input }]) {
     if (message.role === "assistant" && message.is_question) {
       pendingQuestion = identifyQuestion(message.content);
-    } else if (message.role === "user" && pendingQuestion) {
-      answers.set(pendingQuestion.id, message.content);
-      pendingQuestion = null;
+      if (pendingQuestion?.clarifies_question_id) {
+        clarificationAsked.add(pendingQuestion.clarifies_question_id);
+      }
+    } else if (message.role === "user") {
+      const turn = { questionId: null, content: message.content, isClarification: false };
+      if (pendingQuestion) {
+        turn.questionId = pendingQuestion.clarifies_question_id || pendingQuestion.id;
+        turn.isClarification = Boolean(pendingQuestion.clarifies_question_id);
+        responses.push(turn);
+        answers.set(turn.questionId, message.content);
+        pendingQuestion = null;
+      }
+      userTurns.push(turn);
     }
   }
 
-  return answers;
+  return { answers, responses, userTurns, clarificationAsked };
 }
 
 function isYesNoAnswer(text) {
+  if (UNKNOWN_ANSWER.test(text)) return false;
   const normalized = normalizeText(text);
   return /^(?:yes|yeah|yep|no|nope|neither|none|haan|han|nahi|bilkul nahi)\b/i.test(normalized);
+}
+
+function classifyYesNo(text) {
+  if (UNKNOWN_ANSWER.test(text)) return null;
+  const normalized = normalizeText(text);
+  const yes = /\b(?:yes|yeah|yep|haan|han|bilkul)\b/i.test(normalized);
+  const no = /\b(?:no|nope|neither|none|nahi|nahin|nhi)\b/i.test(normalized);
+  if (yes && no) return "conflict";
+  if (yes) return "yes";
+  if (no) return "no";
+  return null;
+}
+
+function classifySeverity(text) {
+  if (UNKNOWN_ANSWER.test(text)) return null;
+  const normalized = normalizeText(text);
+  const severe = /\b(?:severe|very severe|worsening|getting worse|worst|intense|bahut tez|bohot tez|badh raha|badh rahi)\b/i.test(normalized);
+  const explicitlyNotSevere = /\b(?:not|isn['’]?t|isnt|no longer|nahi|nahin|nhi)\b.{0,18}\b(?:very\s+)?(?:severe|intense|tez)\b|\b(?:severe|intense|tez)\b.{0,18}\b(?:nahi|nahin|nhi|not)\b/i.test(normalized);
+  const numericSeverity = normalized.match(/\b(\d{1,2})\s*(?:\/\s*10|out of 10)\b/i);
+  if (numericSeverity) {
+    const score = Number(numericSeverity[1]);
+    if (score <= 6) return "not_severe";
+    if (score >= 7) return "severe";
+  }
+  const mildOrModerate = /\b(?:mild|moderate|manageable|halka|halki|madhyam|fine|okay|ok|improved|better|resolved|gone)\b/i.test(normalized);
+  const notSevere = explicitlyNotSevere || mildOrModerate;
+  if (severe && notSevere && !explicitlyNotSevere) return "conflict";
+  if (severe && explicitlyNotSevere && /\b(?:but|however|lekin|par)\b/i.test(normalized)) return "conflict";
+  if (severe && !explicitlyNotSevere) return "severe";
+  if (notSevere) return "not_severe";
+  return null;
+}
+
+function classifyCriticalAnswer(questionId, text) {
+  if (questionId === "symptom_duration") {
+    if (UNKNOWN_ANSWER.test(text)) return null;
+    const duration = extractDuration(text);
+    if (!duration) return null;
+    const normalized = normalizeText(duration);
+    const fixedDurations = { today: 0, yesterday: 24, "1 week": 168 };
+    if (Object.hasOwn(fixedDurations, normalized)) return `duration:${fixedDurations[normalized]}`;
+    const match = normalized.match(/\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|few|several)\s*(hours?|days?|weeks?|months?)\b/i);
+    if (!match) return null;
+    const numbers = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, few: 3, several: 4 };
+    const amount = Number(match[1]) || numbers[match[1].toLowerCase()];
+    const unit = match[2].toLowerCase();
+    const hours = unit.startsWith("hour") ? amount : unit.startsWith("day") ? amount * 24 : unit.startsWith("week") ? amount * 168 : amount * 720;
+    return `duration:${hours}`;
+  }
+  if (questionId === "breathing_or_chest_check" || questionId === "headache_warning_signs") {
+    return classifyYesNo(text);
+  }
+  if (questionId === "headache_severity" || questionId === "symptom_severity") {
+    return classifySeverity(text);
+  }
+  if (questionId === "fever_severity") {
+    if (UNKNOWN_ANSWER.test(text)) return null;
+    const normalized = normalizeText(text);
+    const high = /\b(?:high|very high|severe|shivering|chills|chilled|102|103|104)\b/i.test(normalized);
+    const low = /\b(?:mild|no fever|not high|halka|halki|thand nahi)\b/i.test(normalized);
+    if (high && low) return "conflict";
+    if (high) return "high";
+    if (low) return "low";
+  }
+  return null;
+}
+
+function questionForSymptom(symptom) {
+  if (symptom === "headache") return "headache_severity";
+  if (symptom === "fever") return "fever_severity";
+  return "symptom_severity";
+}
+
+function symptomIsDenied(text, symptom) {
+  const normalized = normalizeText(text);
+  const terms = {
+    headache: "(?:headache|head\\s*pain|sar\\s*dard)",
+    fever: "(?:fever|bukhar|tap)",
+    cough: "(?:cough|khansi)",
+    respiratory: "(?:breath(?:ing)?|saans)",
+    chest: "(?:chest|seene|chhati)",
+    vomiting: "(?:vomit(?:ing)?|ulti)",
+    diarrhea: "(?:diarrhea|loose\\s*motion|dast)",
+    wound_care: "(?:wound|chot|dressing|stitch)",
+    weakness: "(?:weakness|kamzori|fatigue)",
+    abdominal: "(?:stomach|abdominal|pet)",
+    dizziness: "(?:dizziness|dizzy|chakkar)",
+    skin: "(?:rash|itch(?:ing)?|khujli)",
+    pain: "(?:pain|ache|dard)"
+  }[symptom];
+  if (!terms || UNKNOWN_ANSWER.test(normalized)) return false;
+  const deniedBefore = new RegExp(`\\b(?:no|not|without|denies|don['’]?t have|do not have|doesn['’]?t have|nahi|nahin|nhi)\\b.{0,24}\\b${terms}\\b`, "i");
+  const deniedAfter = new RegExp(`\\b${terms}\\b.{0,20}\\b(?:not present|not there|gone|resolved|absent|nahi|nahin|nhi|nahi hai|nahin hai)\\b`, "i");
+  return deniedBefore.test(normalized) || deniedAfter.test(normalized);
+}
+
+function getAnswerContradiction(questionId, responses) {
+  const relevant = responses.filter((response) => response.questionId === questionId);
+  const lastClarification = relevant.reduce(
+    (lastIndex, response, index) => response.isClarification ? index : lastIndex,
+    -1
+  );
+  const answers = relevant.slice(lastClarification < 0 ? 0 : lastClarification);
+  const classifications = answers
+    .map((response) => classifyCriticalAnswer(questionId, response.content))
+    .filter(Boolean);
+  if (classifications.includes("conflict")) return true;
+  return new Set(classifications).size > 1;
+}
+
+function getSeverityContradictions(userTurns, symptoms) {
+  const severityIds = ["headache_severity", "fever_severity", "symptom_severity"];
+  const clarificationIndex = new Map();
+  userTurns.forEach((turn, index) => {
+    if (turn.isClarification && severityIds.includes(turn.questionId)) {
+      clarificationIndex.set(turn.questionId, index);
+    }
+  });
+  const contradictions = [];
+  for (const symptom of symptoms) {
+    const questionId = questionForSymptom(symptom);
+    const lastClarificationIndex = clarificationIndex.get(questionId) ?? -1;
+    const signals = [];
+    userTurns.forEach((turn, index) => {
+      if (index <= lastClarificationIndex) return;
+      const isTargetedSeverityAnswer = turn.questionId === questionId;
+      const mentionsSymptom = symptom === "headache"
+        ? /\b(?:headache|head\s*pain|sar\s*dard)\b/i.test(normalizeText(turn.content))
+        : symptom === "fever"
+          ? /\b(?:fever|bukhar|tap)\b/i.test(normalizeText(turn.content))
+          : extractSymptoms(turn.content).some((item) => symptoms.includes(item));
+      if (!isTargetedSeverityAnswer && !mentionsSymptom) return;
+      const signal = symptomIsDenied(turn.content, symptom)
+        ? "absent"
+        : symptom === "fever"
+          ? classifyCriticalAnswer("fever_severity", turn.content)
+          : classifySeverity(turn.content);
+      if (signal && signal !== "conflict") signals.push(signal);
+      if (signal === "conflict") signals.push(signal);
+    });
+    if (signals.includes("conflict") || new Set(signals).size > 1) {
+      contradictions.push(questionId);
+    }
+  }
+  return contradictions;
+}
+
+function hasDurationContradiction(userTurns) {
+  const lastClarificationIndex = userTurns.reduce(
+    (lastIndex, turn, index) => turn.isClarification && turn.questionId === "symptom_duration"
+      ? index
+      : lastIndex,
+    -1
+  );
+  const durations = userTurns
+    .filter((turn, index) => index > lastClarificationIndex
+      && (turn.questionId === "symptom_duration" || hasDuration(turn.content)))
+    .map((turn) => classifyCriticalAnswer("symptom_duration", turn.content))
+    .filter(Boolean);
+  return new Set(durations).size > 1;
 }
 
 function hasDuration(text) {
@@ -152,19 +335,26 @@ function getRequiredQuestionIds(symptoms) {
 }
 
 function isQuestionRequirementMet(questionId, context, answer) {
+  if (answer !== undefined && UNKNOWN_ANSWER.test(answer)) return false;
   switch (questionId) {
     case "symptom_duration":
-      return hasDuration(context);
+      return answer !== undefined ? hasDuration(answer) : hasDuration(context);
     case "breathing_or_chest_check":
-      return hasExplicitBreathingOrChestStatus(context) || isYesNoAnswer(answer || "");
+      return answer !== undefined
+        ? classifyYesNo(answer) !== null
+        : hasExplicitBreathingOrChestStatus(context);
     case "headache_warning_signs":
-      return hasHeadacheWarningAnswer(answer || "");
+      return answer !== undefined
+        ? classifyYesNo(answer) !== null
+        : hasHeadacheWarningAnswer(context);
     case "headache_severity":
-      return hasSymptomSeverity(context, "headache");
+      return answer !== undefined
+        ? classifySeverity(answer) !== null
+        : hasSymptomSeverity(context, "headache");
     case "fever_severity":
-      return hasFeverSeverity(context);
+      return answer !== undefined ? hasFeverSeverity(answer) : hasFeverSeverity(context);
     case "symptom_severity":
-      return hasSymptomSeverity(context);
+      return answer !== undefined ? classifySeverity(answer) !== null : hasSymptomSeverity(context);
     default:
       return true;
   }
@@ -193,8 +383,15 @@ function processIntake({ user_input, language = "auto", conversation_history = [
 
   const history = conversation_history || [];
   const priorQuestionMessages = history.filter((msg) => msg.role === "assistant" && msg.is_question);
-  const askedQuestionIds = new Set(priorQuestionMessages.map((msg) => identifyQuestion(msg.content)?.id).filter(Boolean));
-  const questionAnswers = collectQuestionAnswers(history, user_input);
+  const askedQuestionIds = new Set();
+  for (const message of priorQuestionMessages) {
+    const question = identifyQuestion(message.content);
+    if (question) {
+      askedQuestionIds.add(question.id);
+      if (question.clarifies_question_id) askedQuestionIds.add(question.clarifies_question_id);
+    }
+  }
+  const { answers: questionAnswers, responses, userTurns, clarificationAsked } = collectQuestionAnswers(history, user_input);
   const questionsAskedCount = priorQuestionMessages.length;
 
   const symptoms = extractSymptoms(normalizedFull);
@@ -204,10 +401,23 @@ function processIntake({ user_input, language = "auto", conversation_history = [
   const unmetRequirements = requirements.filter((questionId) =>
     !isQuestionRequirementMet(questionId, normalizedFull, questionAnswers.get(questionId))
   );
+  const contradictions = [
+    ...requirements.filter((questionId) => getAnswerContradiction(questionId, responses)),
+    ...getSeverityContradictions(userTurns, symptoms),
+    ...(hasDurationContradiction(userTurns) ? ["symptom_duration"] : [])
+  ].filter((questionId, index, all) => all.indexOf(questionId) === index);
 
   let followUpQuestion = null;
   let unresolvedQuestion = false;
-  if (!has_emergency_red_flag && unmetRequirements.length > 0) {
+  if (!has_emergency_red_flag && contradictions.length > 0) {
+    const clarificationId = CLARIFICATION_QUESTIONS[contradictions[0]];
+    const shouldClarify = clarificationId && !clarificationAsked.has(contradictions[0]);
+    if (shouldClarify && questionsAskedCount < MAX_QUESTION_BUDGET) {
+      followUpQuestion = selectLocalizedQuestion(QUESTIONS_BY_ID.get(clarificationId), detectedLang);
+    } else {
+      unresolvedQuestion = true;
+    }
+  } else if (!has_emergency_red_flag && unmetRequirements.length > 0) {
     const alreadyAskedUnanswered = unmetRequirements.some((questionId) => askedQuestionIds.has(questionId));
     const nextQuestionId = alreadyAskedUnanswered
       ? null
@@ -219,9 +429,6 @@ function processIntake({ user_input, language = "auto", conversation_history = [
     }
   }
 
-  const headacheWarningAnswer = questionAnswers.get("headache_warning_signs") || "";
-  const breathingCheckAnswer = questionAnswers.get("breathing_or_chest_check") || "";
-
   return {
     raw_input: user_input,
     normalized_input: normalizedInput,
@@ -232,11 +439,13 @@ function processIntake({ user_input, language = "auto", conversation_history = [
     symptoms,
     questions_asked_count: questionsAskedCount,
     follow_up_question: followUpQuestion,
-    is_ready_for_triage: unmetRequirements.length === 0,
+    is_ready_for_triage: unmetRequirements.length === 0 && contradictions.length === 0,
     has_unresolved_question: unresolvedQuestion,
     affirmative_headache_warning: symptoms.includes("headache")
-      && /^(?:yes|yeah|yep|haan|han)\b/i.test(normalizeText(headacheWarningAnswer)),
-    affirmative_breathing_or_chest_check: /^(?:yes|yeah|yep|haan|han)\b/i.test(normalizeText(breathingCheckAnswer))
+      && responses.some((response) => response.questionId === "headache_warning_signs"
+        && classifyYesNo(response.content) === "yes"),
+    affirmative_breathing_or_chest_check: responses.some((response) =>
+      response.questionId === "breathing_or_chest_check" && classifyYesNo(response.content) === "yes")
   };
 }
 
